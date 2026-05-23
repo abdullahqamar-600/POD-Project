@@ -38,6 +38,7 @@ import {
   X
 } from "lucide-react";
 import "./styles.css";
+import DesignSystemGallery from "./DesignSystemGallery.jsx";
 import bankOfAmericaLogo from "./assets/bank-of-america.png";
 import chaseLogo from "./assets/chase.png";
 import wellsFargoLogo from "./assets/wells-fargo.png";
@@ -418,6 +419,7 @@ const eventIcon = {
 function App() {
   const [selectedSession, setSelectedSession] = useState("ses-1");
   const [sessions, setSessions] = useState(sessionsSeed);
+  const [activeView, setActiveView] = useState("workspace");
   const [railOpen, setRailOpen] = useState(true);
   const [manageOpen, setManageOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(properties[0]);
@@ -883,6 +885,7 @@ function App() {
     };
     setSessions((current) => [next, ...current]);
     setSelectedSession(id);
+    setActiveView("workspace");
     setUploaded({});
     setExcluded({});
     setRowExpanded({});
@@ -912,83 +915,90 @@ function App() {
         selectedSession={selectedSession}
         setSelectedSession={setSelectedSession}
         onNewSession={createSession}
+        activeView={activeView}
+        setActiveView={setActiveView}
       />
-      <main className="workspace">
+      <main className={`workspace ${activeView === "design-system" ? "design-system-workspace" : ""}`}>
         <TopBar
           selectedProperty={selectedProperty}
           runState={runState}
           railOpen={railOpen}
           setRailOpen={setRailOpen}
+          activeView={activeView}
         />
-        <section className="session-canvas">
-          <div className="session-header">
-            <div>
-              <p className="eyebrow">Reconciliation workspace</p>
-              <h1>{selectedProperty.name}</h1>
-              <p className="subtle">Prepare bank statements, import Yardi ledgers, then hand off to the Reconciliation Agent.</p>
-              <div className="cycle-line">
-                <CalendarDays size={14} />
-                <span>{cycle}</span>
+        {activeView === "workspace" ? (
+          <section className="session-canvas">
+            <div className="session-header">
+              <div>
+                <p className="eyebrow">Reconciliation workspace</p>
+                <h1>{selectedProperty.name}</h1>
+                <p className="subtle">Prepare bank statements, import Yardi ledgers, then hand off to the Reconciliation Agent.</p>
+                <div className="cycle-line">
+                  <CalendarDays size={14} />
+                  <span>{cycle}</span>
+                </div>
+              </div>
+              <div className="header-actions">
+                <button className="soft-button" onClick={() => setManageOpen(true)}>
+                  <Settings size={16} />
+                  Manage properties
+                </button>
+                <button
+                  className={`primary-button ${runState !== "draft" ? "is-running" : ""}`}
+                  disabled={!canStart}
+                  onClick={startRun}
+                >
+                  {runState === "draft" ? (
+                    <Sparkles size={16} />
+                  ) : runState === "complete" ? (
+                    <CheckCircle2 size={16} />
+                  ) : (
+                    <Loader2 size={16} className="spin" />
+                  )}
+                  {runState === "draft"
+                    ? "Start Reconcile from Yardi"
+                    : runState === "running"
+                      ? "Importing and parsing"
+                      : runState === "reconciling"
+                        ? "Reconciling"
+                        : runState === "review"
+                          ? "Review ready"
+                          : runState === "updating-yardi"
+                            ? "Updating Yardi"
+                            : "Complete"}
+                </button>
               </div>
             </div>
-            <div className="header-actions">
-              <button className="soft-button" onClick={() => setManageOpen(true)}>
-                <Settings size={16} />
-                Manage properties
-              </button>
-              <button
-                className={`primary-button ${runState !== "draft" ? "is-running" : ""}`}
-                disabled={!canStart}
-                onClick={startRun}
-              >
-                {runState === "draft" ? (
-                  <Sparkles size={16} />
-                ) : runState === "complete" ? (
-                  <CheckCircle2 size={16} />
-                ) : (
-                  <Loader2 size={16} className="spin" />
-                )}
-                {runState === "draft"
-                  ? "Start Reconcile from Yardi"
-                  : runState === "running"
-                    ? "Importing and parsing"
-                    : runState === "reconciling"
-                      ? "Reconciling"
-                      : runState === "review"
-                        ? "Review ready"
-                        : runState === "updating-yardi"
-                          ? "Updating Yardi"
-                          : "Complete"}
-              </button>
-            </div>
-          </div>
 
-          <ProcessStatus
-            runState={runState}
-            runTotals={runTotals}
-            yardiProgress={yardiProgress}
-            yardiStepIndex={yardiStepIndex}
-          />
+            <ProcessStatus
+              runState={runState}
+              runTotals={runTotals}
+              yardiProgress={yardiProgress}
+              yardiStepIndex={yardiStepIndex}
+            />
 
-          <BankBoard
-            uploaded={uploaded}
-            excluded={excluded}
-            bankStage={bankStage}
-            activeStep={activeStep}
-            runState={runState}
-            recordsByBank={recordsByBank}
-            comparisonProgress={comparisonProgress}
-            rowExpanded={rowExpanded}
-            onUpload={uploadStatement}
-            onExclude={markNotUsed}
-            onToggleRow={toggleRow}
-            onOpenReview={openReview}
-          />
+            <BankBoard
+              uploaded={uploaded}
+              excluded={excluded}
+              bankStage={bankStage}
+              activeStep={activeStep}
+              runState={runState}
+              recordsByBank={recordsByBank}
+              comparisonProgress={comparisonProgress}
+              rowExpanded={rowExpanded}
+              onUpload={uploadStatement}
+              onExclude={markNotUsed}
+              onToggleRow={toggleRow}
+              onOpenReview={openReview}
+            />
 
-          {runState === "review" && (
-            <ReviewSubmitBar runTotals={runTotals} onSubmit={startYardiUpdate} />
-          )}
-        </section>
+            {runState === "review" && (
+              <ReviewSubmitBar runTotals={runTotals} onSubmit={startYardiUpdate} />
+            )}
+          </section>
+        ) : (
+          <DesignSystemGallery banks={banks} recordsByBank={recordsByBank} runTotals={runTotals} />
+        )}
       </main>
 
       <ObservabilityRail
@@ -1065,7 +1075,14 @@ function getComparisonCopy(bank, runState, progress, records) {
   return `Separating ${bank.shortName} approved records from exceptions`;
 }
 
-function Sidebar({ sessions, selectedSession, setSelectedSession, onNewSession }) {
+function Sidebar({
+  sessions,
+  selectedSession,
+  setSelectedSession,
+  onNewSession,
+  activeView,
+  setActiveView
+}) {
   return (
     <aside className="sidebar">
       <div className="brand-row">
@@ -1080,10 +1097,22 @@ function Sidebar({ sessions, selectedSession, setSelectedSession, onNewSession }
         New session
       </button>
       <nav className="nav-links" aria-label="Primary">
-        <a href="#sessions" className="active">
+        <button
+          type="button"
+          className={activeView === "workspace" ? "active" : ""}
+          onClick={() => setActiveView("workspace")}
+        >
           <Inbox size={16} />
           Sessions
-        </a>
+        </button>
+        <button
+          type="button"
+          className={activeView === "design-system" ? "active" : ""}
+          onClick={() => setActiveView("design-system")}
+        >
+          <Sparkles size={16} />
+          Design system
+        </button>
         <a href="#properties">
           <Building2 size={16} />
           Properties
@@ -1104,7 +1133,10 @@ function Sidebar({ sessions, selectedSession, setSelectedSession, onNewSession }
             <button
               className={`session-item ${session.id === selectedSession ? "selected" : ""}`}
               key={session.id}
-              onClick={() => setSelectedSession(session.id)}
+              onClick={() => {
+                setSelectedSession(session.id);
+                setActiveView("workspace");
+              }}
             >
               <StatusDot status={session.status} />
               <strong>{session.property}</strong>
@@ -1126,29 +1158,31 @@ function Sidebar({ sessions, selectedSession, setSelectedSession, onNewSession }
   );
 }
 
-function TopBar({ selectedProperty, runState, railOpen, setRailOpen }) {
+function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView }) {
   return (
     <header className="topbar">
       <div className="breadcrumb">
         <Home size={15} />
         <span>Dashboard</span>
         <ChevronRight size={14} />
-        <span>{selectedProperty.name}</span>
+        <span>{activeView === "design-system" ? "Design system" : selectedProperty.name}</span>
       </div>
       <div className="topbar-actions">
         <span className={`run-dot ${runState}`}>
           <Activity size={14} />
-          {runState === "draft"
-            ? "Draft"
-            : runState === "running"
-              ? "Running"
-              : runState === "reconciling"
-                ? "Reconciling"
-                : runState === "review"
-                  ? "Review"
-                  : runState === "updating-yardi"
-                    ? "Updating"
-                    : "Complete"}
+          {activeView === "design-system"
+            ? "System map"
+            : runState === "draft"
+              ? "Draft"
+              : runState === "running"
+                ? "Running"
+                : runState === "reconciling"
+                  ? "Reconciling"
+                  : runState === "review"
+                    ? "Review"
+                    : runState === "updating-yardi"
+                      ? "Updating"
+                      : "Complete"}
         </span>
         <button className="icon-button rail-toggle" onClick={() => setRailOpen(!railOpen)} aria-label="Toggle observability rail">
           {railOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
