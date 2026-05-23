@@ -491,54 +491,66 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
                   </div>
                 </div>
                 <div className="rail-body">
-                  <div className="agent-run-summary">
-                    <span>Current span</span>
-                    <strong>Reconciliation Agent</strong>
-                    <small>8 trace events captured</small>
-                  </div>
-                  <div className="agent-rail-list">
-                    <RailAgentSpecimen
-                      status="complete"
-                      name="Intake Agent"
-                      role="Imports ledgers and normalizes statements"
-                      summary="Normalized artifacts generated and passed to Reconciliation Agent."
-                      expanded
-                      steps={[
-                        ["Yardi ledgers found", "Ledger files paired with uploaded statements"],
-                        ["Statement fields normalized", "Dates, deposits, withdrawals, and balances aligned"],
-                        ["Handoff prepared", "Normalized artifacts sent to reconciliation"]
-                      ]}
-                      metrics={[
-                        ["Duration", "6.4s"],
-                        ["Input pairs", "3"],
-                        ["Parse issues", "0"],
-                        ["Schema confidence", "98%"]
-                      ]}
-                    />
-                    <RailAgentSpecimen
-                      status="active"
-                      name="Reconciliation Agent"
-                      role="Matches statement rows to Yardi records"
-                      summary="Matching statements with Yardi records in parallel."
-                      expanded
-                      steps={[
-                        ["Comparison spans opened", "Statement rows matched against Yardi ledger rows"],
-                        ["Variance checks running", "Amounts, dates, and references are being scored"]
-                      ]}
-                    />
-                    <RailAgentSpecimen
-                      status="idle"
-                      name="Exception Agent"
-                      role="Explains exceptions and captures guidance"
-                      summary="Waiting for comparison results."
-                    />
-                    <RailAgentSpecimen
-                      status="idle"
-                      name="Posting Agent"
-                      role="Applies Yardi updates and builds reports"
-                      summary="Waiting for reviewed output."
-                    />
-                  </div>
+                  <section className="rail-section-group">
+                    <div className="rail-section-heading">
+                      <strong>Run state</strong>
+                      <span>8 trace events</span>
+                    </div>
+                    <div className="agent-run-summary">
+                      <span>Current span</span>
+                      <strong>Reconciliation Agent</strong>
+                      <small>Matching statements with Yardi records in parallel.</small>
+                    </div>
+                  </section>
+                  <section className="rail-section-group">
+                    <div className="rail-section-heading">
+                      <strong>Agents</strong>
+                      <span>1 of 4 done</span>
+                    </div>
+                    <div className="agent-rail-list">
+                      <RailAgentSpecimen
+                        status="complete"
+                        name="Intake Agent"
+                        role="Imports ledgers and normalizes statements"
+                        summary="Normalized artifacts generated and passed to Reconciliation Agent."
+                        expanded
+                        steps={[
+                          ["Yardi ledgers found", "Ledger files paired with uploaded statements"],
+                          ["Statement fields normalized", "Dates, deposits, withdrawals, and balances aligned"],
+                          ["Handoff prepared", "Normalized artifacts sent to reconciliation"]
+                        ]}
+                        metrics={[
+                          ["Duration", "6.4s"],
+                          ["Input pairs", "3"],
+                          ["Parse issues", "0"],
+                          ["Schema confidence", "98%"]
+                        ]}
+                      />
+                      <RailAgentSpecimen
+                        status="active"
+                        name="Reconciliation Agent"
+                        role="Matches statement rows to Yardi records"
+                        summary="Matching statements with Yardi records in parallel."
+                        expanded
+                        steps={[
+                          ["Comparison spans opened", "Statement rows matched against Yardi ledger rows"],
+                          ["Variance checks running", "Amounts, dates, and references are being scored"]
+                        ]}
+                      />
+                      <RailAgentSpecimen
+                        status="idle"
+                        name="Exception Agent"
+                        role="Explains exceptions and captures guidance"
+                        summary="Waiting for comparison results."
+                      />
+                      <RailAgentSpecimen
+                        status="idle"
+                        name="Posting Agent"
+                        role="Applies Yardi updates and builds reports"
+                        summary="Waiting for reviewed output."
+                      />
+                    </div>
+                  </section>
                 </div>
               </div>
             </div>

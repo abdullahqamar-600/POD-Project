@@ -2111,6 +2111,7 @@ function ObservabilityRail({
   const activeAgent = agents.find((agent) => agent.status === "active");
   const focusAgent = activeAgent || [...agents].reverse().find((agent) => agent.status === "complete");
   const focusAgentId = focusAgent?.id || "";
+  const completedAgentCount = agents.filter((agent) => agent.status === "complete").length;
   const [expandedAgentId, setExpandedAgentId] = useState(focusAgentId);
 
   useEffect(() => {
@@ -2152,23 +2153,35 @@ function ObservabilityRail({
           <div className="rail-body">
             {railTab === "agent-work" ? (
               <>
-                <div className="agent-run-summary">
-                  <span>Current span</span>
-                  <strong>{focusAgent?.name || "Waiting for agent work"}</strong>
-                  <small>{events.length} trace events captured</small>
-                </div>
-                <div className="agent-rail-list">
-                  {agents.map((agent) => (
-                    <AgentRailAccordion
-                      key={agent.id}
-                      agent={agent}
-                      expanded={expandedAgentId === agent.id}
-                      onToggle={() =>
-                        setExpandedAgentId((current) => (current === agent.id ? "" : agent.id))
-                      }
-                    />
-                  ))}
-                </div>
+                <section className="rail-section-group">
+                  <div className="rail-section-heading">
+                    <strong>Run state</strong>
+                    <span>{events.length} trace events</span>
+                  </div>
+                  <div className="agent-run-summary">
+                    <span>Current span</span>
+                    <strong>{focusAgent?.name || "Waiting for agent work"}</strong>
+                    <small>{focusAgent?.latest || "The run will begin after the statements are ready."}</small>
+                  </div>
+                </section>
+                <section className="rail-section-group">
+                  <div className="rail-section-heading">
+                    <strong>Agents</strong>
+                    <span>{completedAgentCount} of {agents.length} done</span>
+                  </div>
+                  <div className="agent-rail-list">
+                    {agents.map((agent) => (
+                      <AgentRailAccordion
+                        key={agent.id}
+                        agent={agent}
+                        expanded={expandedAgentId === agent.id}
+                        onToggle={() =>
+                          setExpandedAgentId((current) => (current === agent.id ? "" : agent.id))
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
               </>
             ) : (
               <ObservabilitySettings />
