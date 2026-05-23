@@ -66,13 +66,13 @@ const radiusTokens = [
 ];
 
 const statusSamples = [
-  ["Draft", "draft", "Draft"],
-  ["Parsing", "parsing", "Parse"],
-  ["Reconciling", "reconciling", "Run"],
-  ["Needs review", "needs-review", "Review"],
-  ["Updating", "updating", "Post"],
-  ["Ready", "ready-for-handoff", "Ready"],
-  ["Complete", "complete", "Done"]
+  ["Not started", "draft", "Not started"],
+  ["Parsing", "parsing", "Parsing"],
+  ["Reconciling", "reconciling", "Reconciling"],
+  ["Needs review", "needs-review", "Needs review"],
+  ["Updating", "updating", "Updating"],
+  ["Ready for handoff", "ready-for-handoff", "Ready for handoff"],
+  ["Complete", "complete", "Complete"]
 ];
 
 const stageSamples = [
@@ -401,6 +401,39 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
                     Artifact history
                   </a>
                 </nav>
+                <div className="sidebar-section ds-session-nav-specimen">
+                  <div className="section-label-row">
+                    <div className="section-label">Running sessions</div>
+                    <button
+                      className="icon-button ghost sidebar-search-toggle active"
+                      type="button"
+                      aria-label="Search running sessions"
+                    >
+                      <Search size={15} />
+                    </button>
+                  </div>
+                  <div className="session-search-box ds-session-search-specimen">
+                    <Search size={15} />
+                    <input value="The Meridian" readOnly aria-label="Search running sessions specimen" />
+                    <button type="button" aria-label="Clear session search specimen">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="session-list ds-session-list-specimen">
+                    <button className="session-item selected" type="button">
+                      <strong>The Meridian</strong>
+                      <span className="status-pill draft">Not started</span>
+                    </button>
+                    <button className="session-item" type="button">
+                      <strong>Oakline Lofts</strong>
+                      <span className="status-pill parsing">Parsing</span>
+                    </button>
+                    <button className="session-item" type="button">
+                      <strong>Harbor Court</strong>
+                      <span className="status-pill needs-input">Needs input</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="ds-module-stack">

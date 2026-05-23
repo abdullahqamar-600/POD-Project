@@ -236,7 +236,7 @@ select:disabled {
 .sidebar-section {
   min-height: 0;
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .section-label,
@@ -248,7 +248,32 @@ select:disabled {
   letter-spacing: 0;
 }
 
-.search-box {
+.section-label-row {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.section-label-row .section-label {
+  min-width: 0;
+}
+
+.sidebar-search-toggle {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
+
+.sidebar-search-toggle.active,
+.sidebar-search-toggle:hover {
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+
+.search-box,
+.session-search-box {
   min-height: 38px;
   border: 1px solid var(--hairline);
   background: var(--surface);
@@ -259,6 +284,37 @@ select:disabled {
   gap: 8px;
   color: var(--muted);
   font-size: 14px;
+}
+
+.session-search-box input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.session-search-box input::placeholder {
+  color: var(--stone);
+}
+
+.session-search-box button {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.session-search-box button:hover {
+  color: var(--ink);
+  background: var(--surface-soft);
 }
 
 .session-list {
@@ -276,9 +332,9 @@ select:disabled {
   color: var(--ink);
   padding: 7px 6px;
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-height: 32px;
 }
 
@@ -311,12 +367,17 @@ select:disabled {
 }
 
 .sidebar .status-pill {
-  max-width: 58px;
+  max-width: 104px;
   overflow: hidden;
   text-overflow: ellipsis;
   border: 1px solid var(--hairline);
   background: var(--surface-soft);
   color: var(--muted);
+}
+
+.sidebar .status-pill.draft {
+  color: var(--muted);
+  background: var(--surface-soft);
 }
 
 .sidebar .status-pill.parsing,
@@ -340,6 +401,17 @@ select:disabled {
 .sidebar .status-pill.complete {
   color: var(--success);
   background: rgba(0, 168, 126, 0.11);
+}
+
+.session-empty {
+  min-height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--surface-soft);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .status-dot {
@@ -2649,10 +2721,21 @@ select:disabled {
 }
 
 .ds-mini-shell {
+  max-width: 280px;
   padding: 10px;
   display: grid;
   align-content: start;
   gap: 10px;
+}
+
+.ds-session-nav-specimen {
+  border-top: 1px solid var(--hairline);
+  padding-top: 10px;
+}
+
+.ds-session-list-specimen {
+  max-height: none;
+  overflow: visible;
 }
 
 .ds-module-stack {

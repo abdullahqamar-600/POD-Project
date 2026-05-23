@@ -1083,6 +1083,24 @@ function Sidebar({
   activeView,
   setActiveView
 }) {
+  const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
+  const [sessionQuery, setSessionQuery] = useState("");
+  const visibleSessions = sessions.filter((session) => {
+    const query = sessionQuery.trim().toLowerCase();
+    if (!query) return true;
+    return [session.property, session.cycle, session.status, session.detail]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
+
+  function toggleSessionSearch() {
+    setSessionSearchOpen((open) => {
+      if (open) setSessionQuery("");
+      return !open;
+    });
+  }
+
   return (
     <aside className="sidebar">
       <div className="brand-row">
@@ -1123,13 +1141,45 @@ function Sidebar({
         </a>
       </nav>
       <div className="sidebar-section">
-        <div className="section-label">Running sessions</div>
-        <div className="search-box">
-          <Search size={15} />
-          <span>Search</span>
+        <div className="section-label-row">
+          <div className="section-label">Running sessions</div>
+          <button
+            className={`icon-button ghost sidebar-search-toggle ${sessionSearchOpen ? "active" : ""}`}
+            type="button"
+            aria-label={sessionSearchOpen ? "Hide session search" : "Search running sessions"}
+            aria-expanded={sessionSearchOpen}
+            onClick={toggleSessionSearch}
+          >
+            <Search size={15} />
+          </button>
         </div>
+        <AnimatePresence initial={false}>
+          {sessionSearchOpen && (
+            <motion.div
+              className="session-search-box"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Search size={15} />
+              <input
+                autoFocus
+                value={sessionQuery}
+                onChange={(event) => setSessionQuery(event.target.value)}
+                placeholder="Search sessions"
+                aria-label="Search running sessions"
+              />
+              {sessionQuery && (
+                <button type="button" onClick={() => setSessionQuery("")} aria-label="Clear session search">
+                  <X size={14} />
+                </button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="session-list">
-          {sessions.map((session) => (
+          {visibleSessions.map((session) => (
             <button
               className={`session-item ${session.id === selectedSession ? "selected" : ""}`}
               key={session.id}
@@ -1138,11 +1188,11 @@ function Sidebar({
                 setActiveView("workspace");
               }}
             >
-              <StatusDot status={session.status} />
               <strong>{session.property}</strong>
               <StatusPill status={session.status} />
             </button>
           ))}
+          {visibleSessions.length === 0 && <div className="session-empty">No sessions found</div>}
         </div>
       </div>
       <div className="sidebar-footer">
@@ -2085,20 +2135,18 @@ function PropertyDrawer({ open, setOpen, properties, selectedProperty, setSelect
 function StatusPill({ status }) {
   const label =
     {
-      "Needs input": "Input",
-      "Needs review": "Review",
-      "Ready for handoff": "Ready",
-      Reconciling: "Run",
-      Parsing: "Parse",
-      Updating: "Post",
-      Complete: "Done"
+      Draft: "Not started",
+      "Needs input": "Needs input",
+      "Needs review": "Needs review",
+      "Ready for handoff": "Ready for handoff",
+      Reconciling: "Reconciling",
+      Importing: "Importing",
+      Parsing: "Parsing",
+      Updating: "Updating",
+      Complete: "Complete"
     }[status] || status;
 
   return <span className={`status-pill ${status.toLowerCase().replaceAll(" ", "-")}`}>{label}</span>;
-}
-
-function StatusDot({ status }) {
-  return <span className={`status-dot ${status.toLowerCase().replaceAll(" ", "-")}`} aria-hidden="true" />;
 }
 
 createRoot(document.getElementById("root")).render(<App />);
