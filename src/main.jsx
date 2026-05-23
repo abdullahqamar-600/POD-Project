@@ -24,13 +24,17 @@ import {
   MoreHorizontal,
   PanelRightClose,
   PanelRightOpen,
+  Pencil,
+  PlayCircle,
   Plus,
   RefreshCw,
+  Save,
   Search,
   Send,
   Settings,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Upload,
   Workflow,
   X
@@ -308,31 +312,116 @@ const sessionsSeed = [
   }
 ];
 
-const properties = [
+const propertySeed = [
   {
     id: "meridian",
+    code: "MER-1849",
     name: "The Meridian",
     address: "1849 Westlake Ave",
-    banks: 3,
-    units: 214
+    market: "Seattle",
+    type: "Multifamily",
+    units: 214,
+    owner: "Westlake Holdings",
+    accountant: "A. Patel",
+    ledgerSource: "Yardi",
+    period: "May 2026",
+    closeStatus: "Ready",
+    openItems: 5,
+    exceptions: 2,
+    tieOut: "Balanced",
+    lastReconciled: "Apr 30, 2026",
+    banks: [
+      { id: "chase-operating", name: "Chase", type: "Operating", account: "4419", gl: "1000-OP" },
+      { id: "wells-reserve", name: "Wells Fargo", type: "Reserve", account: "8821", gl: "1020-RS" },
+      { id: "boa-deposits", name: "BofA", type: "Deposits", account: "1187", gl: "1030-SD" }
+    ]
   },
   {
     id: "oakline",
+    code: "OAK-0022",
     name: "Oakline Lofts",
     address: "22 North Canal",
-    banks: 2,
-    units: 88
+    market: "Portland",
+    type: "Mixed-use",
+    units: 88,
+    owner: "Oakline Partners",
+    accountant: "M. Chen",
+    ledgerSource: "Yardi",
+    period: "May 2026",
+    closeStatus: "Parsing",
+    openItems: 3,
+    exceptions: 1,
+    tieOut: "Pending",
+    lastReconciled: "Apr 30, 2026",
+    banks: [
+      { id: "chase-operating", name: "Chase", type: "Operating", account: "6120", gl: "1000-OP" },
+      { id: "wells-reserve", name: "Wells Fargo", type: "Reserve", account: "2104", gl: "1020-RS" }
+    ]
   },
   {
     id: "harbor",
+    code: "HBR-0710",
     name: "Harbor Court",
     address: "710 Bay Street",
-    banks: 4,
-    units: 132
+    market: "San Diego",
+    type: "Commercial",
+    units: 132,
+    owner: "Harbor Court LP",
+    accountant: "J. Rivera",
+    ledgerSource: "Manual",
+    period: "May 2026",
+    closeStatus: "Needs setup",
+    openItems: 8,
+    exceptions: 4,
+    tieOut: "Needs review",
+    lastReconciled: "Mar 31, 2026",
+    banks: [
+      { id: "chase-operating", name: "Chase", type: "Operating", account: "3320", gl: "1000-OP" },
+      { id: "wells-reserve", name: "Wells Fargo", type: "Reserve", account: "4481", gl: "1020-RS" },
+      { id: "boa-deposits", name: "BofA", type: "Deposits", account: "1190", gl: "1030-SD" },
+      { id: "chase-tax", name: "Chase", type: "Tax escrow", account: "8801", gl: "1040-TX" }
+    ]
+  },
+  {
+    id: "northstar",
+    code: "NOR-0880",
+    name: "Northstar Plaza",
+    address: "880 Glacier Road",
+    market: "Denver",
+    type: "Retail",
+    units: 64,
+    owner: "Northstar REIT",
+    accountant: "S. Malik",
+    ledgerSource: "Yardi",
+    period: "May 2026",
+    closeStatus: "Ready",
+    openItems: 1,
+    exceptions: 0,
+    tieOut: "Balanced",
+    lastReconciled: "Apr 30, 2026",
+    banks: [
+      { id: "chase-operating", name: "Chase", type: "Operating", account: "9091", gl: "1000-OP" },
+      { id: "boa-deposits", name: "BofA", type: "Deposits", account: "4502", gl: "1030-SD" }
+    ]
   }
 ];
 
 const cycleOptions = ["April 2026", "May 2026", "June 2026", "July 2026"];
+
+function getViewFromLocation() {
+  if (typeof window === "undefined") return "workspace";
+  const hash = window.location.hash.replace("#", "");
+  if (hash === "workspace") return "workspace";
+  if (hash === "properties") return "properties";
+  if (hash === "design-system" || hash === "design") return "design-system";
+  return "workspace";
+}
+
+function hashForView(view) {
+  if (view === "properties") return "#properties";
+  if (view === "design-system") return "#design-system";
+  return "#workspace";
+}
 
 const automationSteps = [
   {
@@ -413,10 +502,10 @@ const yardiUpdateSteps = [
 function App() {
   const [selectedSession, setSelectedSession] = useState("ses-1");
   const [sessions, setSessions] = useState(sessionsSeed);
-  const [activeView, setActiveView] = useState("workspace");
+  const [properties, setProperties] = useState(propertySeed);
+  const [activeView, setActiveViewState] = useState(getViewFromLocation);
   const [railOpen, setRailOpen] = useState(true);
-  const [manageOpen, setManageOpen] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState(properties[0]);
+  const [selectedProperty, setSelectedProperty] = useState(propertySeed[0]);
   const [cycle, setCycle] = useState("May 2026");
   const [uploaded, setUploaded] = useState({});
   const [events, setEvents] = useState([
@@ -447,6 +536,22 @@ function App() {
   const canStart = runState === "draft" && uploadedBanks.length > 0;
   const reviewBank = banks.find((bank) => bank.id === reviewBankId);
   const runTotals = getRunTotals(recordsByBank, runBanks);
+
+  function setActiveView(view) {
+    setActiveViewState(view);
+    if (typeof window === "undefined") return;
+    const next = hashForView(view);
+    const current = `${window.location.pathname}${window.location.hash}`;
+    if (current !== next) {
+      window.history.replaceState(null, "", next);
+    }
+  }
+
+  useEffect(() => {
+    const syncViewToHash = () => setActiveViewState(getViewFromLocation());
+    window.addEventListener("hashchange", syncViewToHash);
+    return () => window.removeEventListener("hashchange", syncViewToHash);
+  }, []);
 
   useEffect(() => {
     if (runState !== "running") return;
@@ -892,17 +997,19 @@ function App() {
     ]);
   }
 
-  function createSession() {
+  function createSession(propertyOverride) {
+    const targetProperty = propertyOverride?.id ? propertyOverride : selectedProperty;
     const id = `ses-${sessions.length + 1}`;
     const next = {
       id,
-      property: selectedProperty.name,
+      property: targetProperty.name,
       cycle,
       status: "Draft",
       detail: "New workspace"
     };
     setSessions((current) => [next, ...current]);
     setSelectedSession(id);
+    setSelectedProperty(targetProperty);
     setActiveView("workspace");
     setUploaded({});
     setRowExpanded({});
@@ -925,6 +1032,26 @@ function App() {
     setActiveStep(null);
   }
 
+  function createProperty(property) {
+    setProperties((current) => [property, ...current]);
+    setSelectedProperty(property);
+  }
+
+  function updateProperty(property) {
+    setProperties((current) => current.map((item) => (item.id === property.id ? property : item)));
+    setSelectedProperty(property);
+  }
+
+  function deleteProperty(propertyId) {
+    setProperties((current) => {
+      const next = current.filter((property) => property.id !== propertyId);
+      if (selectedProperty.id === propertyId && next.length > 0) {
+        setSelectedProperty(next[0]);
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -934,7 +1061,6 @@ function App() {
         onNewSession={createSession}
         activeView={activeView}
         setActiveView={setActiveView}
-        onOpenProperties={() => setManageOpen(true)}
       />
       <main className={`workspace ${activeView === "design-system" ? "design-system-workspace" : ""}`}>
         <TopBar
@@ -993,20 +1119,32 @@ function App() {
               <ReviewSubmitBar runTotals={runTotals} onSubmit={startYardiUpdate} />
             )}
           </section>
+        ) : activeView === "properties" ? (
+          <PropertiesScreen
+            properties={properties}
+            selectedProperty={selectedProperty}
+            onSelectProperty={setSelectedProperty}
+            onStartSession={createSession}
+            onCreateProperty={createProperty}
+            onUpdateProperty={updateProperty}
+            onDeleteProperty={deleteProperty}
+          />
         ) : (
           <DesignSystemGallery banks={banks} recordsByBank={recordsByBank} runTotals={runTotals} />
         )}
       </main>
 
-      <ObservabilityRail
-        open={railOpen}
-        events={events}
-        runState={runState}
-        runTotals={runTotals}
-        activeStep={activeStep}
-        yardiProgress={yardiProgress}
-        yardiStepIndex={yardiStepIndex}
-      />
+      {activeView === "workspace" && (
+        <ObservabilityRail
+          open={railOpen}
+          events={events}
+          runState={runState}
+          runTotals={runTotals}
+          activeStep={activeStep}
+          yardiProgress={yardiProgress}
+          yardiStepIndex={yardiStepIndex}
+        />
+      )}
 
       <ReviewModal
         bank={reviewBank}
@@ -1018,13 +1156,6 @@ function App() {
         onComment={addRecordComment}
       />
 
-      <PropertyDrawer
-        open={manageOpen}
-        setOpen={setManageOpen}
-        properties={properties}
-        selectedProperty={selectedProperty}
-        setSelectedProperty={setSelectedProperty}
-      />
     </div>
   );
 }
@@ -1036,6 +1167,112 @@ function getRunBanks(uploaded) {
 
 function updateRunBanks(current, runBanks, stage) {
   return runBanks.reduce((acc, bank) => ({ ...acc, [bank.id]: stage }), current);
+}
+
+function getPropertyBankCount(property) {
+  return Array.isArray(property?.banks) ? property.banks.length : Number(property?.banks || 0);
+}
+
+function formatBankNames(property) {
+  if (!Array.isArray(property?.banks)) return "";
+  return property.banks.map((bank) => `${bank.name} ${bank.type}`).join(", ");
+}
+
+function shortTieOutLabel(value) {
+  if (value === "Balanced") return "OK";
+  if (value === "Needs review") return "Check";
+  if (value === "Pending") return "Wait";
+  return value;
+}
+
+function propertyToDraft(property) {
+  return {
+    name: property?.name || "",
+    code: property?.code || "",
+    address: property?.address || "",
+    market: property?.market || "",
+    type: property?.type || "",
+    units: String(property?.units || ""),
+    owner: property?.owner || "",
+    accountant: property?.accountant || "",
+    ledgerSource: property?.ledgerSource || "Yardi",
+    period: property?.period || "May 2026",
+    closeStatus: property?.closeStatus || "Ready",
+    openItems: String(property?.openItems || 0),
+    exceptions: String(property?.exceptions || 0),
+    tieOut: property?.tieOut || "Balanced",
+    lastReconciled: property?.lastReconciled || "Not reconciled",
+    bankDraft: formatBankNames(property)
+  };
+}
+
+function createEmptyPropertyDraft(index) {
+  return {
+    name: "",
+    code: `NEW-${String(index).padStart(4, "0")}`,
+    address: "",
+    market: "",
+    type: "Multifamily",
+    units: "",
+    owner: "",
+    accountant: "",
+    ledgerSource: "Yardi",
+    period: "May 2026",
+    closeStatus: "Needs setup",
+    openItems: "0",
+    exceptions: "0",
+    tieOut: "Pending",
+    lastReconciled: "Not reconciled",
+    bankDraft: ""
+  };
+}
+
+function propertyFromDraft(draft, existingId) {
+  const name = draft.name.trim() || "Untitled property";
+  return {
+    id: existingId || `${slugify(name)}-${Date.now()}`,
+    code: draft.code.trim() || slugify(name).toUpperCase(),
+    name,
+    address: draft.address.trim(),
+    market: draft.market.trim(),
+    type: draft.type.trim(),
+    units: Number(draft.units) || 0,
+    owner: draft.owner.trim(),
+    accountant: draft.accountant.trim(),
+    ledgerSource: draft.ledgerSource,
+    period: draft.period,
+    closeStatus: draft.closeStatus,
+    openItems: Number(draft.openItems) || 0,
+    exceptions: Number(draft.exceptions) || 0,
+    tieOut: draft.tieOut,
+    lastReconciled: draft.lastReconciled || "Not reconciled",
+    banks: parseBankDraft(draft.bankDraft)
+  };
+}
+
+function parseBankDraft(value) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item, index) => {
+      const parts = item.split(/\s+/);
+      const type = parts.length > 1 ? parts.slice(1).join(" ") : "Operating";
+      return {
+        id: `${slugify(item)}-${index}`,
+        name: parts[0],
+        type,
+        account: "Pending",
+        gl: "Unmapped"
+      };
+    });
+}
+
+function slugify(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 function createRecordState() {
@@ -1217,8 +1454,7 @@ function Sidebar({
   setSelectedSession,
   onNewSession,
   activeView,
-  setActiveView,
-  onOpenProperties
+  setActiveView
 }) {
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
   const [sessionQuery, setSessionQuery] = useState("");
@@ -1252,26 +1488,30 @@ function Sidebar({
         New session
       </button>
       <nav className="nav-links" aria-label="Primary">
-        <button
-          type="button"
+        <a
+          href="#workspace"
           className={activeView === "workspace" ? "active" : ""}
           onClick={() => setActiveView("workspace")}
         >
           <Inbox size={16} />
           Sessions
-        </button>
-        <button
-          type="button"
+        </a>
+        <a
+          href="#design-system"
           className={activeView === "design-system" ? "active" : ""}
           onClick={() => setActiveView("design-system")}
         >
           <Sparkles size={16} />
           Design system
-        </button>
-        <button type="button" onClick={onOpenProperties}>
+        </a>
+        <a
+          href="#properties"
+          className={activeView === "properties" ? "active" : ""}
+          onClick={() => setActiveView("properties")}
+        >
           <Building2 size={16} />
           Properties
-        </button>
+        </a>
       </nav>
       <div className="sidebar-section">
         <div className="section-label-row">
@@ -1342,36 +1582,379 @@ function Sidebar({
 }
 
 function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView }) {
+  const activeLabel =
+    activeView === "design-system"
+      ? "Design system"
+      : activeView === "properties"
+        ? "Properties"
+        : selectedProperty.name;
+  const statusLabel =
+    activeView === "design-system"
+      ? "System map"
+      : activeView === "properties"
+        ? "Portfolio"
+        : runState === "draft"
+          ? "Draft"
+          : runState === "running"
+            ? "Running"
+            : runState === "reconciling"
+              ? "Reconciling"
+              : runState === "review"
+                ? "Review"
+                : runState === "updating-yardi"
+                  ? "Updating"
+                  : "Complete";
+
   return (
     <header className="topbar">
       <div className="breadcrumb">
         <Home size={15} />
         <span>Dashboard</span>
         <ChevronRight size={14} />
-        <span>{activeView === "design-system" ? "Design system" : selectedProperty.name}</span>
+        <span>{activeLabel}</span>
       </div>
       <div className="topbar-actions">
-        <span className={`run-dot ${runState}`}>
+        <span className={`run-dot ${activeView === "properties" ? "complete" : runState}`}>
           <Activity size={14} />
-          {activeView === "design-system"
-            ? "System map"
-            : runState === "draft"
-              ? "Draft"
-              : runState === "running"
-                ? "Running"
-                : runState === "reconciling"
-                  ? "Reconciling"
-                  : runState === "review"
-                    ? "Review"
-                    : runState === "updating-yardi"
-                      ? "Updating"
-                      : "Complete"}
+          {statusLabel}
         </span>
-        <button className="icon-button rail-toggle" onClick={() => setRailOpen(!railOpen)} aria-label="Toggle observability rail">
-          {railOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
-        </button>
+        {activeView === "workspace" && (
+          <button className="icon-button rail-toggle" onClick={() => setRailOpen(!railOpen)} aria-label="Toggle observability rail">
+            {railOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+          </button>
+        )}
       </div>
     </header>
+  );
+}
+
+function PropertiesScreen({
+  properties,
+  selectedProperty,
+  onSelectProperty,
+  onStartSession,
+  onCreateProperty,
+  onUpdateProperty,
+  onDeleteProperty
+}) {
+  const [query, setQuery] = useState("");
+  const [mode, setMode] = useState("view");
+  const [draft, setDraft] = useState(() => propertyToDraft(selectedProperty));
+  const visibleProperties = properties.filter((property) => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return true;
+    return [
+      property.name,
+      property.code,
+      property.address,
+      property.market,
+      property.owner,
+      property.closeStatus,
+      property.ledgerSource,
+      formatBankNames(property)
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(needle);
+  });
+
+  useEffect(() => {
+    if (mode === "create") return;
+    setDraft(propertyToDraft(selectedProperty));
+  }, [mode, selectedProperty]);
+
+  function selectProperty(property) {
+    onSelectProperty(property);
+    setMode("view");
+  }
+
+  function startCreate() {
+    setMode("create");
+    setDraft(createEmptyPropertyDraft(properties.length + 1));
+  }
+
+  function startEdit() {
+    setMode("edit");
+    setDraft(propertyToDraft(selectedProperty));
+  }
+
+  function updateDraft(field, value) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function saveProperty(event) {
+    event.preventDefault();
+    const property = propertyFromDraft(draft, mode === "create" ? undefined : selectedProperty.id);
+    if (mode === "create") {
+      onCreateProperty(property);
+    } else {
+      onUpdateProperty(property);
+    }
+    setMode("view");
+  }
+
+  function removeSelectedProperty() {
+    if (properties.length <= 1) return;
+    onDeleteProperty(selectedProperty.id);
+    setMode("view");
+  }
+
+  const editing = mode === "create" || mode === "edit";
+
+  return (
+    <section className="properties-canvas">
+      <div className="properties-header">
+        <div>
+          <p className="eyebrow">Portfolio</p>
+          <h1>Properties</h1>
+          <p className="subtle">Bank coverage, ledger source, close status.</p>
+        </div>
+        <div className="properties-actions">
+          <button className="soft-button" type="button" onClick={() => onStartSession(selectedProperty)}>
+            <PlayCircle size={15} />
+            Start session
+          </button>
+          <button className="primary-button" type="button" onClick={startCreate}>
+            <Plus size={15} />
+            New property
+          </button>
+        </div>
+      </div>
+
+      <div className="properties-workspace">
+        <section className="property-table-region" aria-label="Property table">
+          <div className="property-table-toolbar">
+            <label className="property-search">
+              <Search size={15} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search properties"
+                aria-label="Search properties"
+              />
+            </label>
+            <span>{visibleProperties.length} properties</span>
+          </div>
+
+          <div className="property-table-shell">
+            <table className="property-table">
+              <thead>
+                <tr>
+                  <th>Property</th>
+                  <th>Banks</th>
+                  <th>Ledger</th>
+                  <th>Close</th>
+                  <th>Open items</th>
+                  <th>Tie-out</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleProperties.map((property) => (
+                  <tr
+                    key={property.id}
+                    className={property.id === selectedProperty.id ? "selected" : ""}
+                    onClick={() => selectProperty(property)}
+                  >
+                    <td>
+                      <div className="property-name-cell">
+                        <strong>{property.name}</strong>
+                        <span>{property.code} · {property.address}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="bank-chip-row">
+                        {property.banks.slice(0, 2).map((bank) => (
+                          <span key={bank.id}>{bank.type}</span>
+                        ))}
+                        {property.banks.length > 2 && <span>+{property.banks.length - 2}</span>}
+                      </div>
+                    </td>
+                    <td>{property.ledgerSource}</td>
+                    <td>
+                      <span className="close-status">{property.closeStatus}</span>
+                      <small>{property.period}</small>
+                    </td>
+                    <td>
+                      <span className={property.openItems > 5 ? "risk-text" : ""}>
+                        {property.openItems} open · {property.exceptions} exceptions
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`tieout-state ${property.tieOut.toLowerCase().replaceAll(" ", "-")}`}>
+                        {shortTieOutLabel(property.tieOut)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside className="property-inspector" aria-label="Selected property">
+          {editing ? (
+            <form className="property-form" onSubmit={saveProperty}>
+              <div className="property-inspector-header">
+                <div>
+                  <p className="eyebrow">{mode === "create" ? "Create" : "Edit"}</p>
+                  <h2>{mode === "create" ? "New property" : selectedProperty.name}</h2>
+                </div>
+                <button className="icon-button ghost" type="button" onClick={() => setMode("view")} aria-label="Cancel">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="property-form-grid">
+                <label>
+                  <span>Name</span>
+                  <input value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} required />
+                </label>
+                <label>
+                  <span>Code</span>
+                  <input value={draft.code} onChange={(event) => updateDraft("code", event.target.value)} required />
+                </label>
+                <label className="wide">
+                  <span>Address</span>
+                  <input value={draft.address} onChange={(event) => updateDraft("address", event.target.value)} required />
+                </label>
+                <label>
+                  <span>Market</span>
+                  <input value={draft.market} onChange={(event) => updateDraft("market", event.target.value)} />
+                </label>
+                <label>
+                  <span>Type</span>
+                  <input value={draft.type} onChange={(event) => updateDraft("type", event.target.value)} />
+                </label>
+                <label>
+                  <span>Units</span>
+                  <input type="number" min="0" value={draft.units} onChange={(event) => updateDraft("units", event.target.value)} />
+                </label>
+                <label>
+                  <span>Owner</span>
+                  <input value={draft.owner} onChange={(event) => updateDraft("owner", event.target.value)} />
+                </label>
+                <label>
+                  <span>Ledger</span>
+                  <select value={draft.ledgerSource} onChange={(event) => updateDraft("ledgerSource", event.target.value)}>
+                    <option>Yardi</option>
+                    <option>Manual</option>
+                    <option>Hybrid</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select value={draft.closeStatus} onChange={(event) => updateDraft("closeStatus", event.target.value)}>
+                    <option>Ready</option>
+                    <option>Parsing</option>
+                    <option>Needs setup</option>
+                    <option>Needs review</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Period</span>
+                  <select value={draft.period} onChange={(event) => updateDraft("period", event.target.value)}>
+                    {cycleOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Tie-out</span>
+                  <select value={draft.tieOut} onChange={(event) => updateDraft("tieOut", event.target.value)}>
+                    <option>Balanced</option>
+                    <option>Pending</option>
+                    <option>Needs review</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Open items</span>
+                  <input type="number" min="0" value={draft.openItems} onChange={(event) => updateDraft("openItems", event.target.value)} />
+                </label>
+                <label>
+                  <span>Exceptions</span>
+                  <input type="number" min="0" value={draft.exceptions} onChange={(event) => updateDraft("exceptions", event.target.value)} />
+                </label>
+                <label className="wide">
+                  <span>Banks</span>
+                  <input
+                    value={draft.bankDraft}
+                    onChange={(event) => updateDraft("bankDraft", event.target.value)}
+                    placeholder="Chase Operating, Wells Fargo Reserve"
+                  />
+                </label>
+              </div>
+              <button className="primary-button" type="submit">
+                <Save size={15} />
+                Save property
+              </button>
+            </form>
+          ) : (
+            <>
+              <div className="property-inspector-header">
+                <div>
+                  <p className="eyebrow">Selected</p>
+                  <h2>{selectedProperty.name}</h2>
+                  <span>{selectedProperty.address}</span>
+                </div>
+                <div className="property-icon-actions">
+                  <button className="icon-button" type="button" onClick={startEdit} aria-label="Edit property">
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={removeSelectedProperty}
+                    disabled={properties.length <= 1}
+                    aria-label="Delete property"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <dl className="property-facts">
+                <div>
+                  <dt>Units</dt>
+                  <dd>{selectedProperty.units}</dd>
+                </div>
+                <div>
+                  <dt>Ledger</dt>
+                  <dd>{selectedProperty.ledgerSource}</dd>
+                </div>
+                <div>
+                  <dt>Open items</dt>
+                  <dd>{selectedProperty.openItems}</dd>
+                </div>
+                <div>
+                  <dt>Exceptions</dt>
+                  <dd>{selectedProperty.exceptions}</dd>
+                </div>
+              </dl>
+
+              <div className="property-bank-list">
+                <div className="property-list-heading">
+                  <strong>Associated banks</strong>
+                  <span>{getPropertyBankCount(selectedProperty)} accounts</span>
+                </div>
+                {selectedProperty.banks.map((bank) => (
+                  <div className="property-bank-row" key={bank.id}>
+                    <div>
+                      <strong>{bank.name}</strong>
+                      <span>{bank.type}</span>
+                    </div>
+                    <span>{bank.account} · {bank.gl}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button className="primary-button" type="button" onClick={() => onStartSession(selectedProperty)}>
+                <PlayCircle size={15} />
+                Start session
+              </button>
+            </>
+          )}
+        </aside>
+      </div>
+    </section>
   );
 }
 
