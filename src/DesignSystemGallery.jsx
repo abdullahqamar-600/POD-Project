@@ -6,7 +6,6 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
-  CircleAlert,
   CircleDot,
   Download,
   FileText,
@@ -309,43 +308,68 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
           </DesignSystemSection>
 
           <DesignSystemSection id="ds-objects" eyebrow="04" title="Financial objects">
-            <div className="ds-object-grid">
-              <div className="ds-object-span">
-                <p className="ds-object-label">Statement tile</p>
-                <BankTileSpecimen bank={bank} />
+            <div className="ds-object-workbench">
+              <div className="ds-workbench-toolbar">
+                <div>
+                  <p className="ds-object-label">Comparison object</p>
+                  <h3>{bank.shortName} statement to Yardi ledger</h3>
+                </div>
+                <div className="ds-workbench-actions">
+                  <span className="stage-badge review">Review</span>
+                  <button className="micro-button" type="button">
+                    <FileText size={14} />
+                    Open review
+                  </button>
+                </div>
               </div>
-              <div className="ds-object-span">
-                <p className="ds-object-label">Comparison pair</p>
-                <ComparisonPairSpecimen bank={bank} records={records} />
+
+              <div className="ds-object-flow">
+                <FinancialSourceCard
+                  type="Statement"
+                  title={bank.shortName}
+                  meta={bank.statement}
+                  logo={bank.logo}
+                  brandClass={bank.brandClass}
+                  metrics={[
+                    ["Lines", bank.transactions],
+                    ["Total", records.statementTotal],
+                    ["Schema", bank.confidence]
+                  ]}
+                />
+                <MatchBridgeSpecimen exceptionCount={records.exceptions.length} />
+                <FinancialSourceCard
+                  type="Yardi ledger"
+                  title={`${bank.type} ledger`}
+                  meta={bank.ledger}
+                  metrics={[
+                    ["Records", records.approved.length + records.exceptions.length],
+                    ["Total", records.ledgerTotal],
+                    ["Match", records.matchRate]
+                  ]}
+                />
               </div>
-              <div>
-                <p className="ds-object-label">Review summary</p>
+
+              <div className="ds-object-bottom-grid">
                 <ReviewSummarySpecimen records={records} />
-              </div>
-              <div>
-                <p className="ds-object-label">Record, open</p>
                 <RecordSpecimen record={exceptionRecord} />
               </div>
-              <div>
-                <p className="ds-object-label">Artifact</p>
-                <button className="artifact-card" type="button">
-                  <Download size={15} />
-                  <div>
-                    <strong>Exception report CSV</strong>
-                    <span>Mock export</span>
-                  </div>
-                </button>
-              </div>
-              <div>
-                <p className="ds-object-label">Property row</p>
-                <button className="property-row selected" type="button">
-                  <div>
-                    <strong>The Meridian</strong>
-                    <span>1849 Westlake Ave</span>
-                  </div>
-                  <small>3 banks</small>
-                </button>
-              </div>
+            </div>
+
+            <div className="ds-supporting-objects">
+              <button className="artifact-card" type="button">
+                <Download size={15} />
+                <div>
+                  <strong>Exception report CSV</strong>
+                  <span>Mock export</span>
+                </div>
+              </button>
+              <button className="property-row selected" type="button">
+                <div>
+                  <strong>The Meridian</strong>
+                  <span>1849 Westlake Ave</span>
+                </div>
+                <small>3 banks</small>
+              </button>
             </div>
           </DesignSystemSection>
 
@@ -573,102 +597,10 @@ function MetricChipPreview({ label, value }) {
   );
 }
 
-function BankTileSpecimen({ bank }) {
-  return (
-    <article className="bank-tile ds-bank-specimen">
-      <div className="bank-main-line">
-        <div className={`bank-logo ${bank.brandClass}`} aria-hidden="true">
-          <img src={bank.logo} alt="" />
-        </div>
-        <div>
-          <strong>{bank.shortName}</strong>
-          <span>{bank.type}</span>
-        </div>
-        <span className="stage-badge statement-ready">Uploaded</span>
-        <button className="micro-button" type="button">
-          <Lock size={14} />
-          Statement locked
-        </button>
-        <button className="micro-button ghost" type="button">
-          <RefreshCw size={14} />
-          Include
-        </button>
-        <span className="summary-trigger" tabIndex="0">
-          <CircleAlert size={13} />
-          <span className="summary-popover">
-            <strong>Parsed statement summary</strong>
-            <span>{bank.transactions} transactions</span>
-            <span>Balance {bank.balance}</span>
-            <span>Schema confidence {bank.confidence}</span>
-          </span>
-        </span>
-      </div>
-    </article>
-  );
-}
-
-function ComparisonPairSpecimen({ bank, records }) {
-  const exceptionCount = records.exceptions.length;
-
-  return (
-    <div className="comparison-row review-ready ds-comparison-row-specimen">
-      <div className="comparison-line">
-        <span className="latest-glyph agent">
-          <Sparkles size={14} />
-        </span>
-        <span>{bank.shortName} summary ready: {records.approved.length} approved, {exceptionCount} exceptions</span>
-      </div>
-      <div className="comparison-pair">
-        <div className="comparison-card statement">
-          <div className="comparison-card-top">
-            <span className={`mini-bank-logo ${bank.brandClass}`}>
-              <img src={bank.logo} alt="" />
-            </span>
-            <div>
-              <span>Bank statement</span>
-              <strong>{bank.shortName}</strong>
-            </div>
-          </div>
-          <div className="comparison-card-meta">
-            <span>{bank.statement}</span>
-            <span>{bank.transactions} lines</span>
-            <strong>{records.statementTotal}</strong>
-          </div>
-        </div>
-        <div className="comparison-bridge complete">
-          <div className="bridge-track">
-            <span className="bridge-pulse one" />
-          </div>
-          <div className="bridge-status">
-            <CheckCircle2 size={13} />
-            {exceptionCount} exceptions
-          </div>
-        </div>
-        <div className="comparison-card ledger">
-          <div className="comparison-card-top">
-            <span className="ledger-mark">
-              <Workflow size={16} />
-            </span>
-            <div>
-              <span>Yardi ledger</span>
-              <strong>{bank.type} ledger</strong>
-            </div>
-          </div>
-          <div className="comparison-card-meta">
-            <span>{bank.ledger}</span>
-            <span>{records.approved.length + exceptionCount} records</span>
-            <strong>{records.ledgerTotal}</strong>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ReviewSummarySpecimen({ records }) {
   return (
-    <div className="bank-review-summary ds-review-summary-specimen">
-      <div className="summary-inner">
+    <div className="ds-review-summary-specimen">
+      <div className="ds-summary-strip">
         <div className="summary-stat approved">
           <BadgeCheck size={16} />
           <div>
@@ -702,20 +634,67 @@ function ReviewSummarySpecimen({ records }) {
   );
 }
 
+function FinancialSourceCard({ type, title, meta, logo, brandClass, metrics }) {
+  return (
+    <section className="financial-source">
+      <div className="financial-source-top">
+        {logo ? (
+          <span className={`mini-bank-logo ${brandClass}`}>
+            <img src={logo} alt="" />
+          </span>
+        ) : (
+          <span className="ledger-mark">
+            <Workflow size={16} />
+          </span>
+        )}
+        <div>
+          <span>{type}</span>
+          <strong>{title}</strong>
+        </div>
+      </div>
+      <p>{meta}</p>
+      <div className="financial-source-metrics">
+        {metrics.map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MatchBridgeSpecimen({ exceptionCount }) {
+  return (
+    <section className="match-bridge-specimen" aria-label={`${exceptionCount} exceptions found`}>
+      <div className="match-rail" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="match-status">
+        <CheckCircle2 size={14} />
+        <strong>{exceptionCount}</strong>
+        <span>Exceptions</span>
+      </div>
+      <small>Matched by amount, date, reference</small>
+    </section>
+  );
+}
+
 function RecordSpecimen({ record }) {
   return (
-    <article className="record-item open ds-record-specimen">
-      <div className="record-row">
-        <button className="record-trigger" type="button">
-          <div>
-            <strong>{record.title}</strong>
-            <span>{record.meta}</span>
-          </div>
-          <div className="record-amount">
-            <strong>{record.amount}</strong>
-            <span>{record.date}</span>
-          </div>
-        </button>
+    <article className="ds-record-specimen">
+      <div className="ds-record-head">
+        <div>
+          <strong>{record.title}</strong>
+          <span>{record.meta}</span>
+        </div>
+        <div className="record-amount">
+          <strong>{record.amount}</strong>
+          <span>{record.date}</span>
+        </div>
         <div className="record-actions">
           <button className="icon-button ghost" type="button" aria-label="Comment">
             <MessageCircle size={15} />
@@ -725,22 +704,18 @@ function RecordSpecimen({ record }) {
           </button>
         </div>
       </div>
-      <div className="record-detail">
-        <div className="record-detail-inner">
-          <div className="reason-block">
-            <span>Agent reason</span>
-            <p>{record.reason}</p>
-          </div>
-          <div className="evidence-list">
-            {record.evidence.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-          <div className="thread-item guidance">
-            <CircleDot size={12} />
-            <span>Guidance captured</span>
-          </div>
-        </div>
+      <div className="reason-block">
+        <span>Agent reason</span>
+        <p>{record.reason}</p>
+      </div>
+      <div className="evidence-list">
+        {record.evidence.map((item) => (
+          <span key={item}>{item}</span>
+        ))}
+      </div>
+      <div className="thread-item guidance">
+        <CircleDot size={12} />
+        <span>Guidance captured</span>
       </div>
     </article>
   );

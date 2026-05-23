@@ -2193,7 +2193,6 @@ select:disabled {
 
 .ds-component-matrix,
 .ds-status-board,
-.ds-object-grid,
 .ds-motion-grid {
   display: grid;
   gap: 10px;
@@ -2337,38 +2336,299 @@ select:disabled {
   min-width: 0;
 }
 
-.ds-object-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-}
-
-.ds-object-span {
-  grid-column: 1 / -1;
-}
-
 .ds-object-label {
   margin: 0 0 7px;
 }
 
-.ds-bank-specimen {
-  max-width: 360px;
+.ds-object-workbench {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow: hidden;
 }
 
-.ds-comparison-row-specimen {
-  max-width: 980px;
+.ds-workbench-toolbar {
+  min-height: 62px;
+  border-bottom: 1px solid var(--hairline);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ds-workbench-toolbar h3 {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.ds-workbench-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ds-object-flow {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 154px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.financial-source {
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  padding: 12px;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+  transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.financial-source:hover {
+  border-color: rgba(58, 64, 196, 0.24);
+  transform: translateY(-1px);
+}
+
+.financial-source-top {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.financial-source-top div {
+  min-width: 0;
+}
+
+.financial-source-top span,
+.financial-source p,
+.financial-source-metrics span,
+.match-bridge-specimen small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.financial-source-top strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.financial-source p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.financial-source-metrics {
+  border-top: 1px solid var(--hairline);
+  padding-top: 9px;
+  display: grid;
+  grid-template-columns: 0.7fr minmax(88px, 1.45fr) 0.75fr;
+  gap: 6px;
+  align-items: end;
+}
+
+.financial-source-metrics div {
+  min-width: 0;
+}
+
+.financial-source-metrics span,
+.financial-source-metrics strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.financial-source-metrics strong {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.match-bridge-specimen {
+  min-width: 0;
+  border-radius: var(--radius-control);
+  background: var(--canvas-light);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px;
+}
+
+.match-rail {
+  position: relative;
+  width: 100%;
+  max-width: 118px;
+  height: 20px;
+}
+
+.match-rail::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 9px;
+  height: 1px;
+  background: var(--hairline);
+}
+
+.match-rail span {
+  position: absolute;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--agent);
+  animation: match-dot 1.45s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.match-rail span:nth-child(1) {
+  left: 16%;
+}
+
+.match-rail span:nth-child(2) {
+  left: calc(50% - 4px);
+  animation-delay: 0.16s;
+}
+
+.match-rail span:nth-child(3) {
+  right: 16%;
+  animation-delay: 0.32s;
+}
+
+@keyframes match-dot {
+  0%,
+  100% {
+    opacity: 0.36;
+    transform: scale(0.82);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.match-status {
+  min-height: 34px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(0, 100, 0, 0.18);
+  background: rgba(0, 168, 126, 0.08);
+  color: var(--success);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+}
+
+.match-status strong {
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.match-status span {
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ds-object-bottom-grid {
+  border-top: 1px solid var(--hairline);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  align-items: start;
 }
 
 .ds-review-summary-specimen {
-  overflow: visible;
+  min-width: 0;
 }
 
-.ds-review-summary-specimen .summary-inner {
+.ds-summary-strip {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ds-record-specimen {
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.ds-record-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.ds-record-head strong,
+.ds-record-head span {
+  display: block;
+}
+
+.ds-record-head > div:first-child {
+  min-width: 0;
+}
+
+.ds-record-head > div:first-child strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-record-head > div:first-child span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ds-record-specimen .record-actions {
   opacity: 1;
   transform: none;
+}
+
+.ds-supporting-objects {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
 }
 
 .ds-layout-grid {
@@ -2580,8 +2840,7 @@ select:disabled {
   .ds-shell,
   .ds-component-matrix,
   .ds-status-board,
-  .ds-process-row,
-  .ds-object-grid {
+  .ds-process-row {
     grid-template-columns: 1fr;
   }
 
@@ -2619,8 +2878,27 @@ select:disabled {
     grid-column: auto;
   }
 
-  .ds-review-summary-specimen .summary-inner {
+  .ds-summary-strip {
     grid-template-columns: 1fr;
+  }
+
+  .ds-workbench-toolbar,
+  .ds-object-flow,
+  .ds-object-bottom-grid,
+  .ds-supporting-objects {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-workbench-toolbar {
+    align-items: stretch;
+  }
+
+  .ds-workbench-actions {
+    justify-content: flex-start;
+  }
+
+  .match-bridge-specimen {
+    min-height: 88px;
   }
 
   .observability.collapsed {
