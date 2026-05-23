@@ -478,6 +478,11 @@ select:disabled {
   background: rgba(0, 168, 126, 0.11);
 }
 
+.stage-badge.not-included {
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
 .stage-badge.muted {
   color: var(--muted);
   background: var(--surface-soft);
@@ -634,15 +639,6 @@ select:disabled {
 
 .cycle-picker select:focus {
   outline: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  width: 100%;
 }
 
 .bank-board {
@@ -971,6 +967,14 @@ select:disabled {
   box-shadow: inset 0 0 0 1px rgba(73, 79, 223, 0.16);
 }
 
+.bank-tile.not-included {
+  color: var(--muted);
+}
+
+.bank-tile.not-included .bank-logo {
+  opacity: 0.72;
+}
+
 .scan-line {
   position: absolute;
   inset: 0;
@@ -1000,20 +1004,21 @@ select:disabled {
 
 .bank-main-line {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr) auto;
+  grid-template-columns: 68px minmax(0, 1fr);
   grid-template-areas:
-    "logo title status"
-    "logo actions actions";
+    "logo title"
+    "logo status"
+    "actions actions";
   align-items: center;
   align-content: start;
-  gap: 8px 10px;
+  gap: 6px 10px;
   min-width: 0;
 }
 
 .bank-logo {
   grid-area: logo;
-  width: 72px;
-  height: 54px;
+  width: 64px;
+  height: 48px;
   border-radius: 10px;
   display: grid;
   place-items: center;
@@ -1030,7 +1035,7 @@ select:disabled {
 }
 
 .bank-logo.chase {
-  width: 78px;
+  width: 68px;
   background: var(--surface);
 }
 
@@ -1065,6 +1070,7 @@ select:disabled {
 
 .bank-main-line .stage-badge {
   grid-area: status;
+  justify-self: start;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1126,15 +1132,34 @@ select:disabled {
 
 .statement-actions .micro-button {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 30px;
+  overflow: hidden;
   padding: 2px 10px;
   font-size: 12px;
+  text-overflow: ellipsis;
 }
 
-.statement-actions .micro-button.ghost {
-  flex: 0 0 auto;
-  padding: 2px 8px;
+.statement-remove-button {
+  flex: 0 0 30px;
   color: var(--muted);
+}
+
+.statement-remove-button:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.statement-static-note {
+  min-height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .comparison-row {
@@ -1706,29 +1731,6 @@ select:disabled {
 
 .agent-run-compact p {
   margin: 0;
-}
-
-.agent-run-summary {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0 16px 16px;
-  display: grid;
-  gap: 4px;
-}
-
-.agent-run-summary span,
-.agent-run-summary small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.agent-run-summary strong {
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.35;
 }
 
 .agent-rail-list {
@@ -3430,11 +3432,6 @@ select:disabled {
   .session-header {
     grid-template-columns: minmax(0, 1fr) auto;
   }
-
-  .header-actions {
-    width: auto;
-    justify-content: flex-end;
-  }
 }
 
 @container (max-width: 560px) {
@@ -3456,7 +3453,6 @@ select:disabled {
 
   .topbar,
   .session-header,
-  .header-actions,
   .board-heading {
     align-items: stretch;
     flex-direction: column;

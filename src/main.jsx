@@ -1371,6 +1371,10 @@ function BankBoard({
     uploadedBanks.length === 1
       ? "1 statement is ready for agent reconciliation"
       : `${uploadedBanks.length} statements are ready for agent reconciliation`;
+  const headingHint =
+    runState === "draft"
+      ? "Upload one or more statements to start"
+      : "Uploaded statements stay visible through the run";
 
   return (
     <section className="bank-board" aria-label="Associated property banks">
@@ -1379,7 +1383,7 @@ function BankBoard({
           <p className="eyebrow">Associated banks</p>
           <h2>Statement workspace</h2>
         </div>
-        <span>Upload one or more statements to start</span>
+        <span>{headingHint}</span>
       </div>
       <div className="bank-grid statement-list">
         {banks.map((bank) => (
@@ -1455,13 +1459,14 @@ function BankTile({
 }) {
   const locked = runState !== "draft";
   const hasFile = Boolean(uploaded);
-  const uploadActionLabel = hasFile ? (locked ? "Statement locked" : "Replace file") : locked ? "No file uploaded" : "Upload statement";
+  const statusStage = hasFile ? stage : locked ? "not-included" : "waiting";
+  const uploadActionLabel = hasFile ? (locked ? "Statement locked" : "Replace file") : "Upload statement";
   const UploadActionIcon = locked && hasFile ? Lock : hasFile ? RefreshCw : Upload;
 
   return (
     <motion.article
       layout
-      className={`bank-tile ${active ? "active" : ""} ${hasFile ? "uploaded" : ""}`}
+      className={`bank-tile ${active ? "active" : ""} ${hasFile ? "uploaded" : ""} ${!hasFile && locked ? "not-included" : ""}`}
       whileHover={{ y: -1 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
     >
@@ -1474,16 +1479,25 @@ function BankTile({
           <strong>{bank.shortName}</strong>
           <span>{bank.type}</span>
         </div>
-        <StageBadge stage={hasFile ? stage : "waiting"} />
+        <StageBadge stage={statusStage} />
         <div className="statement-actions">
-          <button className="micro-button" disabled={locked} onClick={onUpload}>
-            <UploadActionIcon size={14} />
-            {uploadActionLabel}
-          </button>
+          {locked && !hasFile ? (
+            <span className="statement-static-note">Not part of this run</span>
+          ) : (
+            <button className="micro-button" disabled={locked} onClick={onUpload}>
+              <UploadActionIcon size={14} />
+              {uploadActionLabel}
+            </button>
+          )}
           {hasFile && !locked && (
-            <button className="micro-button ghost" type="button" onClick={onRemove}>
+            <button
+              className="icon-button ghost statement-remove-button"
+              type="button"
+              onClick={onRemove}
+              aria-label={`Remove ${bank.shortName} statement`}
+              title="Remove statement"
+            >
               <X size={14} />
-              Remove
             </button>
           )}
           {hasFile && <SummaryHover bank={bank} kind="statement" />}
@@ -1659,9 +1673,9 @@ function ComparisonBridge({ progress, runState, exceptionCount }) {
 
 function SummaryHover({ bank, kind }) {
   return (
-    <span className="summary-trigger" tabIndex="0">
+    <span className="summary-trigger" tabIndex="0" aria-label={`${bank.shortName} parsed statement details`}>
       <CircleAlert size={13} />
-      <span className="summary-popover">
+      <span className="summary-popover" aria-hidden="true">
         <strong>{kind === "statement" ? "Parsed statement summary" : "Ledger summary"}</strong>
         <span>{bank.type}</span>
         <span>{bank.transactions} transactions</span>
@@ -1679,6 +1693,7 @@ function StageBadge({ stage }) {
     {
       waiting: "Missing",
       "statement-ready": "Uploaded",
+      "not-included": "Not included",
       "ledger-importing": "Importing",
       "ledger-imported": "Ledger ready",
       parsing: "Parsing",
@@ -1696,21 +1711,6 @@ function StageBadge({ stage }) {
       {label}
     </span>
   );
-}
-
-function stageLabel(stage, uploaded) {
-  if (!uploaded) return "Ledger waits for statement";
-  if (stage === "statement-ready") return "Yardi ledger pending";
-  if (stage === "ledger-importing") return "Importing from Yardi";
-  if (stage === "ledger-imported") return "Yardi ledger imported";
-  if (stage === "parsing") return "Queued for Parsing Agent";
-  if (stage === "comparing") return "Comparing statement and ledger";
-  if (stage === "normalizing") return "Understanding ledger";
-  if (stage === "normalized") return "Normalized artifact saved";
-  if (stage === "scanning") return "Reconciling statements with ledgers";
-  if (stage === "review") return "Review prepared";
-  if (stage === "complete") return "Session complete";
-  return "Yardi ledger pending";
 }
 
 function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepIndex }) {
