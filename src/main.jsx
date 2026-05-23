@@ -41,7 +41,6 @@ import {
   X
 } from "lucide-react";
 import "./styles.css";
-import DesignSystemGallery from "./DesignSystemGallery.jsx";
 import bankOfAmericaLogo from "../company logos/bank-of-america-logo 1.png";
 import chaseLogo from "../company logos/Chase-National-Bank-Logo 1.png";
 import wellsFargoLogo from "../company logos/Wells_Fargo_Bank.svg 1.png";
@@ -415,14 +414,12 @@ function getViewFromLocation() {
   if (hash === "dashboard" || hash === "") return "dashboard";
   if (hash === "workspace") return "workspace";
   if (hash === "properties") return "properties";
-  if (hash === "design-system" || hash === "design") return "design-system";
   return "dashboard";
 }
 
 function hashForView(view) {
   if (view === "dashboard") return "#dashboard";
   if (view === "properties") return "#properties";
-  if (view === "design-system") return "#design-system";
   return "#workspace";
 }
 
@@ -1081,9 +1078,7 @@ function App() {
         setActiveView={setActiveView}
       />
       <main
-        className={`workspace ${activeView === "design-system" ? "design-system-workspace" : ""} ${
-          activeView === "dashboard" ? "dashboard-workspace" : ""
-        }`}
+        className={`workspace ${activeView === "dashboard" ? "dashboard-workspace" : ""}`}
       >
         <TopBar
           selectedProperty={selectedProperty}
@@ -1149,7 +1144,7 @@ function App() {
               <ReviewSubmitBar runTotals={runTotals} onSubmit={startYardiUpdate} />
             )}
           </section>
-        ) : activeView === "properties" ? (
+        ) : (
           <PropertiesScreen
             properties={properties}
             selectedProperty={selectedProperty}
@@ -1159,8 +1154,6 @@ function App() {
             onUpdateProperty={updateProperty}
             onDeleteProperty={deleteProperty}
           />
-        ) : (
-          <DesignSystemGallery banks={banks} recordsByBank={recordsByBank} runTotals={runTotals} />
         )}
       </main>
 
@@ -1685,22 +1678,6 @@ function Sidebar({
         </div>
       </div>
       <div className="sidebar-footer">
-        <div className="system-switch-row">
-          <span>
-            <Sparkles size={14} />
-            System map
-          </span>
-          <a
-            href={activeView === "design-system" ? "#dashboard" : "#design-system"}
-            className={`view-switch ${activeView === "design-system" ? "active" : ""}`}
-            role="switch"
-            aria-checked={activeView === "design-system"}
-            aria-label="Toggle system map"
-            onClick={() => setActiveView(activeView === "design-system" ? "dashboard" : "design-system")}
-          >
-            <span />
-          </a>
-        </div>
         <div className="credits-widget">
           <div className="credits-row">
             <span>Credits remaining</span>
@@ -1729,16 +1706,12 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
   const activeLabel =
     activeView === "dashboard"
       ? "Dashboard"
-      : activeView === "design-system"
-      ? "Design system"
       : activeView === "properties"
         ? "Properties"
         : selectedProperty.name;
   const statusLabel =
     activeView === "dashboard"
       ? "Live ops"
-      : activeView === "design-system"
-      ? "System map"
       : activeView === "properties"
         ? "Portfolio"
         : runState === "draft"
