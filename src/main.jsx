@@ -22,7 +22,6 @@ import {
   Loader2,
   Lock,
   MessageCircle,
-  MessageSquareText,
   MoreHorizontal,
   PanelRightClose,
   PanelRightOpen,
@@ -410,12 +409,6 @@ const yardiUpdateSteps = [
   "Preparing report package"
 ];
 
-const eventIcon = {
-  user: MessageSquareText,
-  system: Workflow,
-  agent: Sparkles
-};
-
 function App() {
   const [selectedSession, setSelectedSession] = useState("ses-1");
   const [sessions, setSessions] = useState(sessionsSeed);
@@ -691,8 +684,6 @@ function App() {
       window.clearTimeout(finishTimer);
     };
   }, [excluded, recordsByBank, runState, selectedSession]);
-
-  const latestEvent = events[events.length - 1];
 
   function startRun() {
     if (!canStart) return;
@@ -1003,16 +994,12 @@ function App() {
 
       <ObservabilityRail
         open={railOpen}
-        setOpen={setRailOpen}
-        latestEvent={latestEvent}
         events={events}
-        selectedProperty={selectedProperty}
-        cycle={cycle}
-        banks={banks}
-        uploaded={uploaded}
-        excluded={excluded}
-        bankStage={bankStage}
+        runState={runState}
+        runTotals={runTotals}
         activeStep={activeStep}
+        yardiProgress={yardiProgress}
+        yardiStepIndex={yardiStepIndex}
       />
 
       <ReviewModal
@@ -1062,6 +1049,150 @@ function getRunTotals(recordsByBank) {
     },
     { banks: 0, approved: 0, exceptions: 0 }
   );
+}
+
+function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yardiStepIndex }) {
+  const totalRecords = runTotals.approved + runTotals.exceptions;
+  const matchRate = totalRecords ? Math.round((runTotals.approved / totalRecords) * 100) : 0;
+  const intakeComplete = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
+  const reconciliationComplete = ["review", "updating-yardi", "complete"].includes(runState);
+  const exceptionComplete = ["updating-yardi", "complete"].includes(runState);
+  const postingComplete = runState === "complete";
+
+  const intakeStatus = runState === "running" ? "active" : intakeComplete ? "complete" : "idle";
+  const reconciliationStatus =
+    runState === "reconciling" ? "active" : reconciliationComplete ? "complete" : "idle";
+  const exceptionStatus = runState === "review" ? "active" : exceptionComplete ? "complete" : "idle";
+  const postingStatus = runState === "updating-yardi" ? "active" : postingComplete ? "complete" : "idle";
+
+  const intakeTimeline = [
+    { title: "Yardi ledgers found", copy: "Ledger files paired with uploaded statements" },
+    { title: "Statement fields normalized", copy: "Dates, deposits, withdrawals, and balances aligned" },
+    { title: "Source artifacts saved", copy: "Clean inputs stored in artifact history" },
+    { title: "Handoff prepared", copy: "Normalized artifacts sent to reconciliation" }
+  ];
+  const intakeVisibleCount =
+    {
+      "yardi-queued": 1,
+      "yardi-login": 1,
+      "ledgers-found": 1,
+      "parsing-started": 2,
+      "normalizing-chase": 2,
+      "normalizing-wells": 2,
+      "normalizing-boa": 2,
+      "artifacts-saved": 3,
+      handoff: 4
+    }[activeStep?.key] || 1;
+
+  const reconciliationTimeline = [
+    { title: "Comparison spans opened", copy: "Statement rows matched against Yardi ledger rows" },
+    { title: "Variance checks completed", copy: "Amounts, dates, and references scored in parallel" },
+    { title: "Buckets generated", copy: "Approved records and exceptions separated for review" }
+  ];
+
+  const exceptionTimeline = [
+    { title: "Review summary assembled", copy: "Approved records and exceptions grouped by bank" },
+    { title: "Agent reasoning attached", copy: "Evidence chips and match rationale stored per record" },
+    { title: "Reviewer guidance captured", copy: "Corrections remain attached to the session output" }
+  ];
+
+  const postingTimeline = yardiUpdateSteps.map((step) => ({
+    title: step,
+    copy:
+      step === "Preparing report package"
+        ? "Report artifacts and update log are generated"
+        : "Approved records and exception flags are applied"
+  }));
+
+  return [
+    {
+      id: "intake",
+      name: "Intake Agent",
+      role: "Imports ledgers and normalizes statements",
+      status: intakeStatus,
+      latest:
+        intakeStatus === "active"
+          ? activeStep?.copy || "Reading statement-ledger pairs"
+          : intakeStatus === "complete"
+            ? "Normalized artifacts passed to Reconciliation Agent."
+            : "Waiting for statement uploads.",
+      output: "Normalized artifacts generated and passed to Reconciliation Agent.",
+      timeline: timelineForStatus(intakeStatus, intakeTimeline, intakeVisibleCount),
+      metrics: [
+        { label: "Duration", value: "6.4s" },
+        { label: "Input pairs", value: runTotals.banks },
+        { label: "Parse issues", value: "0" },
+        { label: "Schema confidence", value: "98%" }
+      ]
+    },
+    {
+      id: "reconciliation",
+      name: "Reconciliation Agent",
+      role: "Matches statement rows to Yardi records",
+      status: reconciliationStatus,
+      latest:
+        reconciliationStatus === "active"
+          ? activeStep?.copy || "Matching statements with Yardi records"
+          : reconciliationStatus === "complete"
+            ? "Match buckets passed to Exception Agent."
+            : "Waiting for normalized artifacts.",
+      output: "Approved and exception buckets generated for Exception Agent review.",
+      timeline: timelineForStatus(reconciliationStatus, reconciliationTimeline, 2),
+      metrics: [
+        { label: "Duration", value: "5.4s" },
+        { label: "Records checked", value: totalRecords },
+        { label: "Match rate", value: `${matchRate}%` },
+        { label: "Exceptions", value: runTotals.exceptions }
+      ]
+    },
+    {
+      id: "exceptions",
+      name: "Exception Agent",
+      role: "Explains exceptions and captures guidance",
+      status: exceptionStatus,
+      latest:
+        exceptionStatus === "active"
+          ? activeStep?.copy || "Waiting for reviewer decision"
+          : exceptionStatus === "complete"
+            ? "Reviewed package passed to Posting Agent."
+            : "Waiting for comparison results.",
+      output: "Review package prepared and passed to Posting Agent for Yardi update.",
+      timeline: timelineForStatus(exceptionStatus, exceptionTimeline, 2),
+      metrics: [
+        { label: "Duration", value: "0.8s" },
+        { label: "Records reviewed", value: totalRecords },
+        { label: "Guidance captured", value: "1 note" },
+        { label: "Corrections", value: "1 move" }
+      ]
+    },
+    {
+      id: "posting",
+      name: "Posting Agent",
+      role: "Applies Yardi updates and builds reports",
+      status: postingStatus,
+      latest:
+        postingStatus === "active"
+          ? activeStep?.copy || yardiUpdateSteps[yardiStepIndex]
+          : postingStatus === "complete"
+            ? "Yardi updates and report artifacts are ready."
+            : "Waiting for reviewed output.",
+      output: "Yardi updates, exception flags, and report artifacts generated.",
+      timeline: timelineForStatus(postingStatus, postingTimeline, Math.max(1, yardiStepIndex + 1)),
+      metrics: [
+        { label: "Duration", value: "5.6s" },
+        { label: "Posted records", value: runTotals.approved },
+        { label: "Flagged exceptions", value: runTotals.exceptions },
+        { label: "Post failures", value: "0" }
+      ],
+      progress: yardiProgress
+    }
+  ];
+}
+
+function timelineForStatus(status, timeline, activeCount) {
+  if (status === "idle") return [];
+  if (status === "active") return timeline.slice(0, Math.max(1, activeCount));
+  return timeline;
 }
 
 function getComparisonCopy(bank, runState, progress, records) {
@@ -1968,17 +2099,24 @@ function RecordItem({
 
 function ObservabilityRail({
   open,
-  setOpen,
-  latestEvent,
   events,
-  selectedProperty,
-  cycle,
-  banks,
-  uploaded,
-  excluded,
-  bankStage,
-  activeStep
+  runState,
+  runTotals,
+  activeStep,
+  yardiProgress,
+  yardiStepIndex
 }) {
+  const [railTab, setRailTab] = useState("agent-work");
+  const agents = getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yardiStepIndex });
+  const activeAgent = agents.find((agent) => agent.status === "active");
+  const focusAgent = activeAgent || [...agents].reverse().find((agent) => agent.status === "complete");
+  const focusAgentId = focusAgent?.id || "";
+  const [expandedAgentId, setExpandedAgentId] = useState(focusAgentId);
+
+  useEffect(() => {
+    setExpandedAgentId(focusAgentId);
+  }, [focusAgentId]);
+
   return (
     <motion.aside
       layout
@@ -1988,94 +2126,177 @@ function ObservabilityRail({
       {open && (
         <>
           <div className="rail-header">
-            <div>
-              <p className="eyebrow">Observability</p>
-              <strong>Run rail</strong>
+            <div className="rail-tabs" role="tablist" aria-label="Observability rail">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={railTab === "agent-work"}
+                className={railTab === "agent-work" ? "active" : ""}
+                onClick={() => setRailTab("agent-work")}
+              >
+                <Activity size={14} />
+                Agent work
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={railTab === "settings"}
+                className={railTab === "settings" ? "active" : ""}
+                onClick={() => setRailTab("settings")}
+              >
+                <Settings size={14} />
+                Settings
+              </button>
             </div>
           </div>
-        <div className="rail-body">
-          <div className="context-panel">
-            <div>
-              <Building2 size={15} />
-              <span>{selectedProperty.name}</span>
-            </div>
-            <div>
-              <CalendarDays size={15} />
-              <span>{cycle}</span>
-            </div>
+          <div className="rail-body">
+            {railTab === "agent-work" ? (
+              <>
+                <div className="agent-run-summary">
+                  <span>Current span</span>
+                  <strong>{focusAgent?.name || "Waiting for agent work"}</strong>
+                  <small>{events.length} trace events captured</small>
+                </div>
+                <div className="agent-rail-list">
+                  {agents.map((agent) => (
+                    <AgentRailAccordion
+                      key={agent.id}
+                      agent={agent}
+                      expanded={expandedAgentId === agent.id}
+                      onToggle={() =>
+                        setExpandedAgentId((current) => (current === agent.id ? "" : agent.id))
+                      }
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <ObservabilitySettings />
+            )}
           </div>
-
-          <section className="rail-section">
-            <RailSectionHeader title="Input inventory" meta={`${banks.length} banks`} />
-            <div className="inventory-list">
-              {banks.map((bank) => (
-                <div key={bank.id} className="inventory-item">
-                  <span>{bank.name}</span>
-                  <small>
-                    {excluded[bank.id]
-                      ? "Not used"
-                      : uploaded[bank.id]
-                        ? stageLabel(bankStage[bank.id], uploaded[bank.id], excluded[bank.id])
-                        : "Missing"}
-                  </small>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rail-section">
-            <RailSectionHeader title="Current work" meta={activeStep?.type || "system"} />
-            <motion.div
-              key={activeStep?.key || "idle"}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`active-work ${activeStep?.type || "system"}`}
-            >
-              <LatestGlyph type={activeStep?.type || "system"} />
-              <div>
-                <strong>{activeStep?.title || "Waiting for statements"}</strong>
-                <span>{activeStep?.copy || "Upload each associated bank statement"}</span>
-              </div>
-            </motion.div>
-          </section>
-
-          <section className="rail-section">
-            <RailSectionHeader title="Run timeline" meta={`${events.length} events`} />
-            <div className="timeline">
-              {events.slice(-9).map((event) => (
-                <div key={event.id} className={`timeline-item ${event.type}`}>
-                  <LatestGlyph type={event.type} />
-                  <div>
-                    <strong>{event.title}</strong>
-                    <span>{event.copy}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
         </>
       )}
     </motion.aside>
   );
 }
 
-function RailSectionHeader({ title, meta }) {
+function AgentRailAccordion({ agent, expanded, onToggle }) {
+  const StatusIcon =
+    agent.status === "complete" ? CheckCircle2 : agent.status === "active" ? Loader2 : CircleDot;
+
   return (
-    <div className="rail-section-header">
-      <strong>{title}</strong>
-      <span>{meta}</span>
+    <section className={`agent-accordion ${agent.status}`}>
+      <button
+        className="agent-accordion-button"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        <span className={`agent-state-mark ${agent.status}`}>
+          <StatusIcon size={14} className={agent.status === "active" ? "spin" : ""} />
+        </span>
+        <span className="agent-heading">
+          <strong>{agent.name}</strong>
+          <span>{agent.role}</span>
+        </span>
+        <span className={`agent-status-pill ${agent.status}`}>{agentStatusLabel(agent.status)}</span>
+        <ChevronRight size={14} className={`agent-accordion-chevron ${expanded ? "expanded" : ""}`} />
+      </button>
+      <p className="agent-latest">{agent.status === "complete" ? agent.output : agent.latest}</p>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            className="agent-accordion-panel"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {agent.timeline.length > 0 ? (
+              <ol className="agent-step-list">
+                {agent.timeline.map((step, index) => {
+                  const isCurrent = agent.status === "active" && index === agent.timeline.length - 1;
+                  return (
+                    <li key={`${agent.id}-${step.title}`} className={isCurrent ? "current" : "done"}>
+                      <span>{isCurrent ? <Loader2 size={12} className="spin" /> : <CheckCircle2 size={12} />}</span>
+                      <div>
+                        <strong>{step.title}</strong>
+                        <small>{step.copy}</small>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="agent-empty-note">No trace emitted yet.</p>
+            )}
+
+            {agent.status === "complete" && (
+              <div className="agent-metrics-grid" aria-label={`${agent.name} completion metrics`}>
+                {agent.metrics.map((metric) => (
+                  <div className="agent-metric" key={`${agent.id}-${metric.label}`}>
+                    <span>{metric.label}</span>
+                    <strong>{metric.value}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {agent.status === "active" && (
+              <div className="agent-live-note">
+                <Activity size={13} />
+                <span>
+                  {agent.progress !== undefined
+                    ? `${agent.progress}% complete`
+                    : "Open span is still collecting signals"}
+                </span>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function ObservabilitySettings() {
+  return (
+    <div className="rail-settings-panel">
+      <section>
+        <h3>Rail behavior</h3>
+        <label className="settings-toggle-row">
+          <input type="checkbox" defaultChecked />
+          <span>
+            <strong>Follow active agent</strong>
+            <small>Open the agent that is currently working.</small>
+          </span>
+        </label>
+        <label className="settings-toggle-row">
+          <input type="checkbox" defaultChecked />
+          <span>
+            <strong>Show completion metrics</strong>
+            <small>Reveal duration, throughput, and exception load after handoff.</small>
+          </span>
+        </label>
+      </section>
+      <section>
+        <h3>Notifications</h3>
+        <label className="settings-toggle-row">
+          <input type="checkbox" />
+          <span>
+            <strong>Pause on exceptions</strong>
+            <small>Ask before posting when exception load increases.</small>
+          </span>
+        </label>
+      </section>
     </div>
   );
 }
 
-function LatestGlyph({ type }) {
-  const Icon = eventIcon[type] || Workflow;
-  return (
-    <span className={`latest-glyph ${type || "system"}`}>
-      <Icon size={14} />
-    </span>
-  );
+function agentStatusLabel(status) {
+  if (status === "complete") return "Done";
+  if (status === "active") return "Working";
+  return "Idle";
 }
 
 function PropertyDrawer({ open, setOpen, properties, selectedProperty, setSelectedProperty }) {

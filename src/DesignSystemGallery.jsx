@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Building2,
   CalendarDays,
+  ChevronRight,
   CheckCircle2,
   CircleDot,
   Download,
@@ -478,35 +479,65 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
 
               <div className="ds-rail-specimen">
                 <div className="rail-header">
-                  <div>
-                    <p className="eyebrow">Observability</p>
-                    <strong>Run rail</strong>
+                  <div className="rail-tabs" role="tablist" aria-label="Rail specimen tabs">
+                    <button className="active" type="button" role="tab" aria-selected="true">
+                      <Activity size={14} />
+                      Agent work
+                    </button>
+                    <button type="button" role="tab" aria-selected="false">
+                      <Settings size={14} />
+                      Settings
+                    </button>
                   </div>
                 </div>
                 <div className="rail-body">
-                  <div className="context-panel">
-                    <div>
-                      <Building2 size={15} />
-                      <span>The Meridian</span>
-                    </div>
-                    <div>
-                      <CalendarDays size={15} />
-                      <span>May 2026</span>
-                    </div>
+                  <div className="agent-run-summary">
+                    <span>Current span</span>
+                    <strong>Reconciliation Agent</strong>
+                    <small>8 trace events captured</small>
                   </div>
-                  <div className="active-work agent">
-                    <span className="latest-glyph agent">
-                      <Sparkles size={14} />
-                    </span>
-                    <div>
-                      <strong>Reconciliation Agent started</strong>
-                      <span>Parallel comparison running</span>
-                    </div>
-                  </div>
-                  <div className="timeline">
-                    <TimelineSpecimen type="user" title="Statement uploaded" copy={bank.name} />
-                    <TimelineSpecimen type="system" title="Ledgers imported" copy="One ledger mapped to each statement" />
-                    <TimelineSpecimen type="agent" title="Exception Agent opened review" copy="Records prepared" />
+                  <div className="agent-rail-list">
+                    <RailAgentSpecimen
+                      status="complete"
+                      name="Intake Agent"
+                      role="Imports ledgers and normalizes statements"
+                      summary="Normalized artifacts generated and passed to Reconciliation Agent."
+                      expanded
+                      steps={[
+                        ["Yardi ledgers found", "Ledger files paired with uploaded statements"],
+                        ["Statement fields normalized", "Dates, deposits, withdrawals, and balances aligned"],
+                        ["Handoff prepared", "Normalized artifacts sent to reconciliation"]
+                      ]}
+                      metrics={[
+                        ["Duration", "6.4s"],
+                        ["Input pairs", "3"],
+                        ["Parse issues", "0"],
+                        ["Schema confidence", "98%"]
+                      ]}
+                    />
+                    <RailAgentSpecimen
+                      status="active"
+                      name="Reconciliation Agent"
+                      role="Matches statement rows to Yardi records"
+                      summary="Matching statements with Yardi records in parallel."
+                      expanded
+                      steps={[
+                        ["Comparison spans opened", "Statement rows matched against Yardi ledger rows"],
+                        ["Variance checks running", "Amounts, dates, and references are being scored"]
+                      ]}
+                    />
+                    <RailAgentSpecimen
+                      status="idle"
+                      name="Exception Agent"
+                      role="Explains exceptions and captures guidance"
+                      summary="Waiting for comparison results."
+                    />
+                    <RailAgentSpecimen
+                      status="idle"
+                      name="Posting Agent"
+                      role="Applies Yardi updates and builds reports"
+                      summary="Waiting for reviewed output."
+                    />
                   </div>
                 </div>
               </div>
@@ -754,18 +785,58 @@ function RecordSpecimen({ record }) {
   );
 }
 
-function TimelineSpecimen({ type, title, copy }) {
-  const Icon = type === "agent" ? Sparkles : type === "system" ? Workflow : MessageCircle;
+function RailAgentSpecimen({ status, name, role, summary, expanded = false, steps = [], metrics = [] }) {
+  const StatusIcon = status === "complete" ? CheckCircle2 : status === "active" ? Loader2 : CircleDot;
+  const statusLabel = status === "complete" ? "Done" : status === "active" ? "Working" : "Idle";
 
   return (
-    <div className={`timeline-item ${type}`}>
-      <span className={`latest-glyph ${type}`}>
-        <Icon size={14} />
-      </span>
-      <div>
-        <strong>{title}</strong>
-        <span>{copy}</span>
-      </div>
-    </div>
+    <section className={`agent-accordion ${status}`}>
+      <button className="agent-accordion-button" type="button" aria-expanded={expanded}>
+        <span className={`agent-state-mark ${status}`}>
+          <StatusIcon size={14} className={status === "active" ? "spin" : ""} />
+        </span>
+        <span className="agent-heading">
+          <strong>{name}</strong>
+          <span>{role}</span>
+        </span>
+        <span className={`agent-status-pill ${status}`}>{statusLabel}</span>
+        <ChevronRight size={14} className={`agent-accordion-chevron ${expanded ? "expanded" : ""}`} />
+      </button>
+      <p className="agent-latest">{summary}</p>
+      {expanded && (
+        <div className="agent-accordion-panel">
+          <ol className="agent-step-list">
+            {steps.map(([title, copy], index) => {
+              const isCurrent = status === "active" && index === steps.length - 1;
+              return (
+                <li key={title} className={isCurrent ? "current" : "done"}>
+                  <span>{isCurrent ? <Loader2 size={12} className="spin" /> : <CheckCircle2 size={12} />}</span>
+                  <div>
+                    <strong>{title}</strong>
+                    <small>{copy}</small>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          {metrics.length > 0 && (
+            <div className="agent-metrics-grid">
+              {metrics.map(([label, value]) => (
+                <div className="agent-metric" key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+          {status === "active" && (
+            <div className="agent-live-note">
+              <Activity size={13} />
+              <span>Open span is still collecting signals</span>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
