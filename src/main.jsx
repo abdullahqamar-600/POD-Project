@@ -37,9 +37,9 @@ import {
 } from "lucide-react";
 import "./styles.css";
 import DesignSystemGallery from "./DesignSystemGallery.jsx";
-import bankOfAmericaLogo from "./assets/bank-of-america.png";
-import chaseLogo from "./assets/chase.png";
-import wellsFargoLogo from "./assets/wells-fargo.png";
+import bankOfAmericaLogo from "../company logos/bank-of-america-logo 1.png";
+import chaseLogo from "../company logos/Chase-National-Bank-Logo 1.png";
+import wellsFargoLogo from "../company logos/Wells_Fargo_Bank.svg 1.png";
 
 const banks = [
   {
