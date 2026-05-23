@@ -1396,22 +1396,28 @@ select:disabled {
 
 .summary-inner {
   min-height: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
-  gap: 7px;
+  gap: 0;
   align-items: center;
 }
 
 .summary-stat {
-  min-height: 42px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
-  border: 1px solid var(--hairline);
+  min-height: 48px;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 7px;
+  gap: 8px;
+  padding: 8px 10px;
   min-width: 0;
+}
+
+.summary-stat + .summary-stat {
+  border-left: 1px solid var(--hairline);
 }
 
 .summary-stat svg {
@@ -1436,18 +1442,33 @@ select:disabled {
 }
 
 .summary-stat strong {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.15;
 }
 
 .summary-stat span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .open-review {
-  min-height: 34px;
+  align-self: stretch;
+  min-height: 48px;
+  border: 0;
+  border-left: 1px solid var(--hairline);
+  border-radius: 0;
+  background: transparent;
+  padding: 0 12px;
   justify-self: end;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.open-review:hover {
+  background: var(--surface-soft);
 }
 
 .latest-glyph {
@@ -3075,9 +3096,14 @@ select:disabled {
 }
 
 .ds-summary-strip {
+  border: 1px solid var(--hairline);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+}
+
+.ds-summary-strip .summary-stat:first-child {
+  border-left: 0;
 }
 
 .ds-record-specimen {
@@ -3460,6 +3486,18 @@ select:disabled {
   .artifact-list,
   .review-columns {
     grid-template-columns: 1fr;
+  }
+
+  .summary-stat + .summary-stat,
+  .open-review {
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .open-review {
+    width: 100%;
+    justify-self: stretch;
+    justify-content: flex-start;
   }
 
   .record-column + .record-column {
