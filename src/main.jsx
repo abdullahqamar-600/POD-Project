@@ -1112,16 +1112,16 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
   return [
     {
       id: "intake",
-      name: "Intake Agent",
+      name: "Intake",
       role: "Imports ledgers and normalizes statements",
       status: intakeStatus,
       latest:
         intakeStatus === "active"
           ? activeStep?.copy || "Reading statement-ledger pairs"
           : intakeStatus === "complete"
-            ? "Normalized artifacts passed to Reconciliation Agent."
+            ? "Normalized artifacts passed to Reconciliation."
             : "Waiting for statement uploads.",
-      output: "Normalized artifacts generated and passed to Reconciliation Agent.",
+      output: "Normalized artifacts generated and passed to Reconciliation.",
       timeline: timelineForStatus(intakeStatus, intakeTimeline, intakeVisibleCount),
       metrics: [
         { label: "Duration", value: "6.4s" },
@@ -1132,16 +1132,16 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     },
     {
       id: "reconciliation",
-      name: "Reconciliation Agent",
+      name: "Reconciliation",
       role: "Matches statement rows to Yardi records",
       status: reconciliationStatus,
       latest:
         reconciliationStatus === "active"
           ? activeStep?.copy || "Matching statements with Yardi records"
           : reconciliationStatus === "complete"
-            ? "Match buckets passed to Exception Agent."
+            ? "Match buckets passed to Exception."
             : "Waiting for normalized artifacts.",
-      output: "Approved and exception buckets generated for Exception Agent review.",
+      output: "Approved and exception buckets generated for Exception review.",
       timeline: timelineForStatus(reconciliationStatus, reconciliationTimeline, 2),
       metrics: [
         { label: "Duration", value: "5.4s" },
@@ -1152,16 +1152,16 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     },
     {
       id: "exceptions",
-      name: "Exception Agent",
+      name: "Exception",
       role: "Explains exceptions and captures guidance",
       status: exceptionStatus,
       latest:
         exceptionStatus === "active"
           ? activeStep?.copy || "Waiting for reviewer decision"
           : exceptionStatus === "complete"
-            ? "Reviewed package passed to Posting Agent."
+            ? "Reviewed package passed to Summary."
             : "Waiting for comparison results.",
-      output: "Review package prepared and passed to Posting Agent for Yardi update.",
+      output: "Review package prepared and passed to Summary for Yardi update.",
       timeline: timelineForStatus(exceptionStatus, exceptionTimeline, 2),
       metrics: [
         { label: "Duration", value: "0.8s" },
@@ -1172,7 +1172,7 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     },
     {
       id: "posting",
-      name: "Posting Agent",
+      name: "Summary",
       role: "Applies Yardi updates and builds reports",
       status: postingStatus,
       latest:
