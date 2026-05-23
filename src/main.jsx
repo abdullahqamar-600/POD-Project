@@ -1514,6 +1514,10 @@ function ComparisonBankRow({ bank, records, progress, stage, runState, expanded,
   const approvedCount = records.approved.length;
   const exceptionCount = records.exceptions.length;
   const liveCopy = getComparisonCopy(bank, runState, progress, records);
+  const headerTitle = isReviewReady ? `${bank.shortName} review packet` : `${bank.shortName} reconciliation`;
+  const headerCopy = isReviewReady
+    ? "Statement and ledger are paired. Exceptions are ready for review."
+    : liveCopy;
 
   return (
     <motion.article
@@ -1527,7 +1531,24 @@ function ComparisonBankRow({ bank, records, progress, stage, runState, expanded,
         <span className={`latest-glyph ${isFinalizing ? "system" : "agent"}`}>
           {isComplete ? <CheckCircle2 size={14} /> : isFinalizing ? <Workflow size={14} /> : <Sparkles size={14} />}
         </span>
-        <span>{liveCopy}</span>
+        <div className="comparison-line-copy">
+          <strong>{headerTitle}</strong>
+          <span>{headerCopy}</span>
+        </div>
+        {isReviewReady && (
+          <div className="comparison-outcomes" aria-label={`${approvedCount} approved records and ${exceptionCount} exceptions`}>
+            <span className="comparison-outcome approved">
+              <BadgeCheck size={13} />
+              <strong>{approvedCount}</strong>
+              approved
+            </span>
+            <span className="comparison-outcome exception">
+              <AlertTriangle size={13} />
+              <strong>{exceptionCount}</strong>
+              exceptions
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="comparison-pair">
@@ -1554,7 +1575,7 @@ function ComparisonBankRow({ bank, records, progress, stage, runState, expanded,
 
       {isReviewReady && (
         <div className="row-review-shell">
-          <button className="row-expand-button" onClick={onToggle}>
+          <button className="row-expand-button" type="button" onClick={onToggle}>
             <span>{expanded ? "Hide summary" : "Show summary"}</span>
             <ChevronRight size={15} className={expanded ? "rotated" : ""} />
           </button>
@@ -1596,7 +1617,7 @@ function ComparisonBankRow({ bank, records, progress, stage, runState, expanded,
                       <span>Match confidence</span>
                     </div>
                   </div>
-                  <button className="soft-button open-review" onClick={onOpenReview} disabled={runState === "updating-yardi"}>
+                  <button className="soft-button open-review" type="button" onClick={onOpenReview} disabled={runState === "updating-yardi"}>
                     <FileText size={15} />
                     Open review
                   </button>
@@ -2143,9 +2164,11 @@ function ObservabilityRail({
               <button
                 type="button"
                 role="tab"
-                aria-selected={railTab === "settings"}
-                className={railTab === "settings" ? "active" : ""}
-                onClick={() => setRailTab("settings")}
+                aria-selected="false"
+                aria-disabled="true"
+                className="disabled"
+                disabled
+                title="Settings are not configured yet"
               >
                 <Settings size={14} />
                 Settings
