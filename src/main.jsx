@@ -16,6 +16,7 @@ import {
   ClipboardCheck,
   Download,
   FileText,
+  FileSpreadsheet,
   Home,
   Inbox,
   Loader2,
@@ -409,15 +410,17 @@ const propertySeed = [
 const cycleOptions = ["April 2026", "May 2026", "June 2026", "July 2026"];
 
 function getViewFromLocation() {
-  if (typeof window === "undefined") return "workspace";
+  if (typeof window === "undefined") return "dashboard";
   const hash = window.location.hash.replace("#", "");
+  if (hash === "dashboard" || hash === "") return "dashboard";
   if (hash === "workspace") return "workspace";
   if (hash === "properties") return "properties";
   if (hash === "design-system" || hash === "design") return "design-system";
-  return "workspace";
+  return "dashboard";
 }
 
 function hashForView(view) {
+  if (view === "dashboard") return "#dashboard";
   if (view === "properties") return "#properties";
   if (view === "design-system") return "#design-system";
   return "#workspace";
@@ -530,6 +533,7 @@ function App() {
   const [reviewBankId, setReviewBankId] = useState(null);
   const [yardiProgress, setYardiProgress] = useState(0);
   const [yardiStepIndex, setYardiStepIndex] = useState(0);
+  const [newSessionOpen, setNewSessionOpen] = useState(false);
 
   const uploadedBanks = banks.filter((bank) => uploaded[bank.id]);
   const runBanks = uploadedBanks.length > 0 ? uploadedBanks : banks;
@@ -997,6 +1001,19 @@ function App() {
     ]);
   }
 
+  function openNewSessionPicker() {
+    setActiveView("dashboard");
+    setNewSessionOpen(true);
+  }
+
+  function openDashboardSession(session) {
+    const property = properties.find((item) => item.name === session.property);
+    setSelectedSession(session.id);
+    if (property) setSelectedProperty(property);
+    setCycle(session.cycle);
+    setActiveView("workspace");
+  }
+
   function createSession(propertyOverride) {
     const targetProperty = propertyOverride?.id ? propertyOverride : selectedProperty;
     const id = `ses-${sessions.length + 1}`;
@@ -1010,6 +1027,7 @@ function App() {
     setSessions((current) => [next, ...current]);
     setSelectedSession(id);
     setSelectedProperty(targetProperty);
+    setNewSessionOpen(false);
     setActiveView("workspace");
     setUploaded({});
     setRowExpanded({});
@@ -1058,11 +1076,15 @@ function App() {
         sessions={sessions}
         selectedSession={selectedSession}
         setSelectedSession={setSelectedSession}
-        onNewSession={createSession}
+        onNewSession={openNewSessionPicker}
         activeView={activeView}
         setActiveView={setActiveView}
       />
-      <main className={`workspace ${activeView === "design-system" ? "design-system-workspace" : ""}`}>
+      <main
+        className={`workspace ${activeView === "design-system" ? "design-system-workspace" : ""} ${
+          activeView === "dashboard" ? "dashboard-workspace" : ""
+        }`}
+      >
         <TopBar
           selectedProperty={selectedProperty}
           runState={runState}
@@ -1070,7 +1092,15 @@ function App() {
           setRailOpen={setRailOpen}
           activeView={activeView}
         />
-        {activeView === "workspace" ? (
+        {activeView === "dashboard" ? (
+          <DashboardScreen
+            sessions={sessions}
+            properties={properties}
+            selectedSession={selectedSession}
+            onOpenSession={openDashboardSession}
+            onNewSession={openNewSessionPicker}
+          />
+        ) : activeView === "workspace" ? (
           <section className="session-canvas">
             <div className="session-header">
               <div>
@@ -1156,6 +1186,13 @@ function App() {
         onComment={addRecordComment}
       />
 
+      <NewSessionLauncher
+        open={newSessionOpen}
+        properties={properties}
+        onClose={() => setNewSessionOpen(false)}
+        onSelectProperty={createSession}
+      />
+
     </div>
   );
 }
@@ -1183,6 +1220,93 @@ function shortTieOutLabel(value) {
   if (value === "Needs review") return "Check";
   if (value === "Pending") return "Wait";
   return value;
+}
+
+function getDashboardStats(sessions, properties) {
+  const activeStatuses = new Set(["Importing", "Parsing", "Reconciling", "Updating"]);
+  const reviewStatuses = new Set(["Needs review", "Ready for handoff"]);
+  return {
+    activeAgents: sessions.filter((session) => activeStatuses.has(session.status)).length + 1,
+    runningSessions: sessions.filter((session) => activeStatuses.has(session.status)).length,
+    reviewItems: properties.reduce((sum, property) => sum + property.exceptions, 0),
+    intakeActive: sessions.some((session) => ["Importing", "Parsing"].includes(session.status)),
+    reconActive: sessions.some((session) => session.status === "Reconciling"),
+    exceptionActive: sessions.some((session) => reviewStatuses.has(session.status)),
+    summaryActive: sessions.some((session) => session.status === "Updating")
+  };
+}
+
+function getSessionAgents(status = "Draft") {
+  const templates = {
+    Draft: [
+      ["Intake", "idle", "Waiting for statements"],
+      ["Reconcile", "idle", "Waiting for normalized files"],
+      ["Exception", "idle", "Waiting for match buckets"],
+      ["Summary", "idle", "Waiting for review output"]
+    ],
+    "Needs input": [
+      ["Intake", "blocked", "Missing source files"],
+      ["Reconcile", "idle", "Waiting for normalized files"],
+      ["Exception", "idle", "Waiting for match buckets"],
+      ["Summary", "idle", "Waiting for review output"]
+    ],
+    Importing: [
+      ["Intake", "active", "Importing ledgers"],
+      ["Reconcile", "idle", "Waiting for normalized files"],
+      ["Exception", "idle", "Waiting for match buckets"],
+      ["Summary", "idle", "Waiting for review output"]
+    ],
+    Parsing: [
+      ["Intake", "active", "Normalizing statement-ledger pairs"],
+      ["Reconcile", "idle", "Waiting for normalized files"],
+      ["Exception", "idle", "Waiting for match buckets"],
+      ["Summary", "idle", "Waiting for review output"]
+    ],
+    Reconciling: [
+      ["Intake", "complete", "Artifacts passed forward"],
+      ["Reconcile", "active", "Matching rows in parallel"],
+      ["Exception", "idle", "Waiting for match buckets"],
+      ["Summary", "idle", "Waiting for review output"]
+    ],
+    "Needs review": [
+      ["Intake", "complete", "Artifacts passed forward"],
+      ["Reconcile", "complete", "Match buckets generated"],
+      ["Exception", "active", "Reviewer decision needed"],
+      ["Summary", "idle", "Waiting for review output"]
+    ],
+    Updating: [
+      ["Intake", "complete", "Artifacts passed forward"],
+      ["Reconcile", "complete", "Match buckets generated"],
+      ["Exception", "complete", "Review package approved"],
+      ["Summary", "active", "Posting records and reports"]
+    ],
+    "Ready for handoff": [
+      ["Intake", "complete", "Artifacts passed forward"],
+      ["Reconcile", "complete", "Match buckets generated"],
+      ["Exception", "complete", "Review package prepared"],
+      ["Summary", "idle", "Waiting for controller handoff"]
+    ],
+    Complete: [
+      ["Intake", "complete", "Artifacts passed forward"],
+      ["Reconcile", "complete", "Match buckets generated"],
+      ["Exception", "complete", "Exceptions flagged"],
+      ["Summary", "complete", "Reports ready"]
+    ]
+  };
+
+  return (templates[status] || templates.Draft).map(([name, statusValue, copy]) => ({
+    name,
+    status: statusValue,
+    copy
+  }));
+}
+
+function agentLaneLabel(name) {
+  if (name === "Intake") return "In";
+  if (name === "Reconcile") return "Rec";
+  if (name === "Exception") return "Rev";
+  if (name === "Summary") return "Rpt";
+  return name.slice(0, 3);
 }
 
 function propertyToDraft(property) {
@@ -1489,12 +1613,12 @@ function Sidebar({
       </button>
       <nav className="nav-links" aria-label="Primary">
         <a
-          href="#workspace"
-          className={activeView === "workspace" ? "active" : ""}
-          onClick={() => setActiveView("workspace")}
+          href="#dashboard"
+          className={activeView === "dashboard" ? "active" : ""}
+          onClick={() => setActiveView("dashboard")}
         >
           <Inbox size={16} />
-          Sessions
+          Dashboard
         </a>
         <a
           href="#properties"
@@ -1550,7 +1674,7 @@ function Sidebar({
               key={session.id}
               onClick={() => {
                 setSelectedSession(session.id);
-                setActiveView("workspace");
+                setActiveView("dashboard");
               }}
             >
               <strong>{session.property}</strong>
@@ -1567,12 +1691,12 @@ function Sidebar({
             System map
           </span>
           <a
-            href={activeView === "design-system" ? "#workspace" : "#design-system"}
+            href={activeView === "design-system" ? "#dashboard" : "#design-system"}
             className={`view-switch ${activeView === "design-system" ? "active" : ""}`}
             role="switch"
             aria-checked={activeView === "design-system"}
             aria-label="Toggle system map"
-            onClick={() => setActiveView(activeView === "design-system" ? "workspace" : "design-system")}
+            onClick={() => setActiveView(activeView === "design-system" ? "dashboard" : "design-system")}
           >
             <span />
           </a>
@@ -1603,13 +1727,17 @@ function Sidebar({
 
 function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView }) {
   const activeLabel =
-    activeView === "design-system"
+    activeView === "dashboard"
+      ? "Dashboard"
+      : activeView === "design-system"
       ? "Design system"
       : activeView === "properties"
         ? "Properties"
         : selectedProperty.name;
   const statusLabel =
-    activeView === "design-system"
+    activeView === "dashboard"
+      ? "Live ops"
+      : activeView === "design-system"
       ? "System map"
       : activeView === "properties"
         ? "Portfolio"
@@ -1622,8 +1750,14 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
               : runState === "review"
                 ? "Review"
                 : runState === "updating-yardi"
-                  ? "Updating"
-                  : "Complete";
+            ? "Updating"
+            : "Complete";
+  const statusClass =
+    activeView === "dashboard"
+      ? "dashboard"
+      : activeView === "properties"
+        ? "complete"
+        : runState;
 
   return (
     <header className="topbar">
@@ -1634,7 +1768,7 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
         <span>{activeLabel}</span>
       </div>
       <div className="topbar-actions">
-        <span className={`run-dot ${activeView === "properties" ? "complete" : runState}`}>
+        <span className={`run-dot ${statusClass}`}>
           <Activity size={14} />
           {statusLabel}
         </span>
@@ -1645,6 +1779,239 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
         )}
       </div>
     </header>
+  );
+}
+
+function DashboardScreen({ sessions, properties, selectedSession, onOpenSession, onNewSession }) {
+  const selected = sessions.find((session) => session.id === selectedSession) || sessions[0];
+  const selectedProperty =
+    properties.find((property) => property.name === selected?.property) || properties[0];
+  const stats = getDashboardStats(sessions, properties);
+  const observabilityMetrics = [
+    { label: "Trace health", value: "Stable", meta: "0 automation issues" },
+    { label: "Active agents", value: stats.activeAgents, meta: `${stats.runningSessions} ${stats.runningSessions === 1 ? "session" : "sessions"} running` },
+    { label: "Avg run time", value: "12.4s", meta: "P95 18.1s" },
+    { label: "Human review", value: stats.reviewItems, meta: "open exceptions" }
+  ];
+  const agents = [
+    { name: "Intake", status: stats.intakeActive ? "active" : "complete", metric: "98% parse confidence" },
+    { name: "Reconciliation", status: stats.reconActive ? "active" : "complete", metric: "96% match rate" },
+    { name: "Exception", status: stats.exceptionActive ? "active" : "idle", metric: `${stats.reviewItems} records queued` },
+    { name: "Summary", status: stats.summaryActive ? "active" : "idle", metric: "3 reports ready" }
+  ];
+
+  return (
+    <section className="dashboard-canvas" aria-label="Dashboard">
+      <section className="dashboard-observability-strip" aria-label="AI observability summary">
+        <div className="dashboard-observability-copy">
+          <p className="eyebrow">AI observability</p>
+          <h1>Agent visibility across runs</h1>
+          <p>
+            Trace, handoff, and review health for the close workflow.
+          </p>
+          <div className="agent-chip-row" aria-label="Agent runtime status">
+            {agents.map((agent) => (
+              <span className={`agent-visibility-chip ${agent.status}`} key={agent.name}>
+                {agent.status === "active" ? <Loader2 size={13} className="spin" /> : <CircleDot size={13} />}
+                {agent.name}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="dashboard-metric-grid">
+          {observabilityMetrics.map((metric) => (
+            <div className="dashboard-metric" key={metric.label}>
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+              <small>{metric.meta}</small>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="dashboard-session-workspace" aria-label="Session workspace">
+        <div className="dashboard-workspace-head">
+          <div>
+            <p className="eyebrow">Parallel agent workspace</p>
+            <h2>Past sessions and summaries</h2>
+          </div>
+          <button className="primary-button" type="button" onClick={onNewSession}>
+            <Plus size={15} />
+            New session
+          </button>
+        </div>
+
+        <div className="dashboard-workspace-grid">
+          <div className="dashboard-session-list" aria-label="Past reconciliation sessions">
+            <div className="dashboard-session-columns" aria-hidden="true">
+              <span>Session</span>
+              <span>Stage</span>
+              <span>Agents</span>
+              <span>Summary</span>
+            </div>
+            <div className="dashboard-session-rows">
+              {sessions.map((session) => {
+                const property = properties.find((item) => item.name === session.property);
+                const sessionAgents = getSessionAgents(session.status);
+                return (
+                  <button
+                    className={`dashboard-session-row ${session.id === selected?.id ? "selected" : ""}`}
+                    key={session.id}
+                    type="button"
+                    onClick={() => onOpenSession(session)}
+                  >
+                    <span className="dashboard-session-name">
+                      <strong>{session.property}</strong>
+                      <small>{session.cycle} · {property?.accountant || "Unassigned"}</small>
+                    </span>
+                    <DashboardStatusPill status={session.status} />
+                    <span className="dashboard-agent-pipeline" aria-label={`${session.property} agent stages`}>
+                      {sessionAgents.map((agent) => (
+                        <span className={`dashboard-agent-node ${agent.status}`} key={agent.name}>
+                          <i aria-hidden="true" />
+                          <span>{agentLaneLabel(agent.name)}</span>
+                          <small>{agent.name}</small>
+                        </span>
+                      ))}
+                    </span>
+                    <span className="dashboard-session-facts">
+                      <strong>{property?.exceptions ?? 0}</strong>
+                      <small>{property?.openItems ?? 0} open · {getPropertyBankCount(property)} banks</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <aside className="dashboard-session-inspector" aria-label="Selected session summary">
+            <div className="dashboard-inspector-head">
+              <p className="eyebrow">Selected session</p>
+              <h3>{selected?.property}</h3>
+              <span>{selected?.cycle} · {selected?.detail}</span>
+            </div>
+            <div className="dashboard-inspector-facts">
+              <div>
+                <span>Banks</span>
+                <strong>{getPropertyBankCount(selectedProperty)}</strong>
+              </div>
+              <div>
+                <span>Tie-out</span>
+                <strong>{shortTieOutLabel(selectedProperty?.tieOut)}</strong>
+              </div>
+              <div>
+                <span>Open items</span>
+                <strong>{selectedProperty?.openItems}</strong>
+              </div>
+              <div>
+                <span>Exceptions</span>
+                <strong>{selectedProperty?.exceptions}</strong>
+              </div>
+            </div>
+            <div className="dashboard-agent-detail-list">
+              {getSessionAgents(selected?.status).map((agent) => (
+                <div className={`dashboard-agent-detail ${agent.status}`} key={agent.name}>
+                  <span>
+                    {agent.status === "active" ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
+                  </span>
+                  <div>
+                    <strong>{agent.name} Agent</strong>
+                    <small>{agent.copy}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button className="soft-button dashboard-open-workspace" type="button" onClick={() => onOpenSession(selected)}>
+              <PlayCircle size={15} />
+              Open workspace
+            </button>
+          </aside>
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function NewSessionLauncher({ open, properties, onClose, onSelectProperty }) {
+  const [query, setQuery] = useState("");
+  const visibleProperties = properties.filter((property) => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return true;
+    return [property.name, property.code, property.address, property.market, property.owner, formatBankNames(property)]
+      .join(" ")
+      .toLowerCase()
+      .includes(needle);
+  });
+
+  useEffect(() => {
+    if (open) setQuery("");
+  }, [open]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className="session-launcher-scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.aside
+            className="session-launcher"
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 10 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Start a new reconciliation session"
+          >
+            <div className="session-launcher-head">
+              <div>
+                <p className="eyebrow">New session</p>
+                <h2>Select a property</h2>
+                <span>May 2026 reconciliation workspace</span>
+              </div>
+              <button className="icon-button" type="button" onClick={onClose} aria-label="Close new session">
+                <X size={17} />
+              </button>
+            </div>
+            <label className="session-launcher-search">
+              <Search size={15} />
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search properties"
+                aria-label="Search properties for a new session"
+              />
+            </label>
+            <div className="session-launcher-list">
+              {visibleProperties.map((property) => (
+                <button
+                  className="session-launcher-property"
+                  type="button"
+                  key={property.id}
+                  onClick={() => onSelectProperty(property)}
+                >
+                  <span>
+                    <strong>{property.name}</strong>
+                    <small>{property.code} · {property.address}</small>
+                  </span>
+                  <span className="session-launcher-meta">
+                    <small>{getPropertyBankCount(property)} banks</small>
+                    <strong>{property.tieOut}</strong>
+                  </span>
+                </button>
+              ))}
+              {visibleProperties.length === 0 && <div className="session-empty">No properties found</div>}
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -2203,7 +2570,7 @@ function ComparisonBankRow({ bank, records, progress, stage, runState, expanded,
           count={`${bank.transactions} lines`}
           total={records.statementTotal}
         />
-        <ComparisonBridge progress={progress} runState={runState} exceptionCount={exceptionCount} />
+        <ComparisonBridge progress={progress} runState={runState} matchRate={records.matchRate} />
         <ComparisonCard
           side="ledger"
           title={`${bank.type} ledger`}
@@ -2284,12 +2651,12 @@ function ComparisonCard({ side, logo, brandClass, title, kicker, meta, count, to
           </span>
         ) : (
           <span className="ledger-mark">
-            <Workflow size={16} />
+            <FileSpreadsheet size={17} />
           </span>
         )}
         <div>
-          <span>{kicker}</span>
           <strong>{title}</strong>
+          <span>{kicker}</span>
         </div>
       </div>
       <div className="comparison-card-total">
@@ -2307,28 +2674,18 @@ function ComparisonCard({ side, logo, brandClass, title, kicker, meta, count, to
   );
 }
 
-function ComparisonBridge({ progress, runState, exceptionCount }) {
+function ComparisonBridge({ progress, runState, matchRate }) {
   const complete = ["review", "updating-yardi", "complete"].includes(runState);
+  const bridgeValue = complete ? matchRate : `${progress}%`;
   return (
-    <div className={`comparison-bridge ${complete ? "complete" : ""}`}>
-      <div className="bridge-track">
-        <span className="bridge-pulse one" />
-        <span className="bridge-pulse two" />
-        <span className="bridge-pulse three" />
-      </div>
-      <div className="bridge-status">
-        {complete ? (
-          <>
-            <CheckCircle2 size={13} />
-            {exceptionCount > 0 ? `${exceptionCount} exceptions` : "Matched"}
-          </>
-        ) : (
-          <>
-            <Loader2 size={13} className="spin" />
-            {progress}%
-          </>
-        )}
-      </div>
+    <div
+      className={`comparison-bridge ${complete ? "complete" : "running"}`}
+      style={{ "--bridge-progress": `${complete ? 100 : progress}%` }}
+    >
+      <div className="bridge-track" aria-hidden="true" />
+      <span className="bridge-percent" aria-label={complete ? `${bridgeValue} match confidence` : `${bridgeValue} reconciled`}>
+        {bridgeValue}
+      </span>
     </div>
   );
 }
@@ -3036,6 +3393,23 @@ function StatusPill({ status }) {
       "Needs input": "Needs input",
       "Needs review": "Needs review",
       "Ready for handoff": "Ready for handoff",
+      Reconciling: "Reconciling",
+      Importing: "Importing",
+      Parsing: "Parsing",
+      Updating: "Updating",
+      Complete: "Complete"
+    }[status] || status;
+
+  return <span className={`status-pill ${status.toLowerCase().replaceAll(" ", "-")}`}>{label}</span>;
+}
+
+function DashboardStatusPill({ status }) {
+  const label =
+    {
+      Draft: "Not started",
+      "Needs input": "Needs input",
+      "Needs review": "Review",
+      "Ready for handoff": "Ready",
       Reconciling: "Reconciling",
       Importing: "Importing",
       Parsing: "Parsing",

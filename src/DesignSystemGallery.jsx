@@ -10,6 +10,7 @@ import {
   CircleDot,
   Download,
   FileText,
+  FileSpreadsheet,
   Home,
   Inbox,
   Loader2,
@@ -336,7 +337,7 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
                     ["Schema", bank.confidence]
                   ]}
                 />
-                <MatchBridgeSpecimen exceptionCount={records.exceptions.length} />
+                <MatchBridgeSpecimen matchRate={records.matchRate} />
                 <FinancialSourceCard
                   type="Yardi ledger"
                   title={`${bank.type} ledger`}
@@ -561,28 +562,16 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
               </div>
               <div className="ds-motion-specimen">
                 <strong>Comparison bridge</strong>
-                <div className="comparison-bridge">
-                  <div className="bridge-track">
-                    <span className="bridge-pulse one" />
-                    <span className="bridge-pulse two" />
-                    <span className="bridge-pulse three" />
-                  </div>
-                  <div className="bridge-status">
-                    <Loader2 size={13} className="spin" />
-                    68%
-                  </div>
+                <div className="comparison-bridge running" style={{ "--bridge-progress": "68%" }}>
+                  <div className="bridge-track" aria-hidden="true" />
+                  <span className="bridge-percent">68%</span>
                 </div>
               </div>
               <div className="ds-motion-specimen">
                 <strong>Complete bridge</strong>
-                <div className="comparison-bridge complete">
-                  <div className="bridge-track">
-                    <span className="bridge-pulse one" />
-                  </div>
-                  <div className="bridge-status">
-                    <CheckCircle2 size={13} />
-                    2 exceptions
-                  </div>
+                <div className="comparison-bridge complete" style={{ "--bridge-progress": "100%" }}>
+                  <div className="bridge-track" aria-hidden="true" />
+                  <span className="bridge-percent">96%</span>
                 </div>
               </div>
               <div className="ds-motion-specimen">
@@ -716,7 +705,7 @@ function FinancialSourceCard({ type, title, meta, logo, brandClass, metrics }) {
           </span>
         ) : (
           <span className="ledger-mark">
-            <Workflow size={16} />
+            <FileSpreadsheet size={17} />
           </span>
         )}
         <div>
@@ -744,18 +733,12 @@ function FinancialSourceCard({ type, title, meta, logo, brandClass, metrics }) {
   );
 }
 
-function MatchBridgeSpecimen({ exceptionCount }) {
+function MatchBridgeSpecimen({ matchRate }) {
   return (
-    <section className="match-bridge-specimen" aria-label={`${exceptionCount} exceptions found`}>
-      <div className="match-rail" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="match-status">
-        <CheckCircle2 size={14} />
-        <strong>{exceptionCount}</strong>
-        <span>Exceptions</span>
+    <section className="match-bridge-specimen" aria-label={`${matchRate} match confidence`}>
+      <div className="comparison-bridge complete" style={{ "--bridge-progress": "100%" }}>
+        <div className="bridge-track" aria-hidden="true" />
+        <span className="bridge-percent">{matchRate}</span>
       </div>
       <small>Matched by amount, date, reference</small>
     </section>
