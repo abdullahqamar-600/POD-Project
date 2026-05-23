@@ -1091,7 +1091,6 @@ function App() {
           <DashboardScreen
             sessions={sessions}
             properties={properties}
-            selectedSession={selectedSession}
             onOpenSession={openDashboardSession}
             onNewSession={openNewSessionPicker}
           />
@@ -1222,6 +1221,9 @@ function getDashboardStats(sessions, properties) {
     activeAgents: sessions.filter((session) => activeStatuses.has(session.status)).length + 1,
     runningSessions: sessions.filter((session) => activeStatuses.has(session.status)).length,
     reviewItems: properties.reduce((sum, property) => sum + property.exceptions, 0),
+    stalledHandoffs: 0,
+    matchRate: "94.2%",
+    matchRateTrend: "1.8% vs last cycle",
     intakeActive: sessions.some((session) => ["Importing", "Parsing"].includes(session.status)),
     reconActive: sessions.some((session) => session.status === "Reconciling"),
     exceptionActive: sessions.some((session) => reviewStatuses.has(session.status)),
@@ -1229,77 +1231,22 @@ function getDashboardStats(sessions, properties) {
   };
 }
 
-function getSessionAgents(status = "Draft") {
-  const templates = {
-    Draft: [
-      ["Intake", "idle", "Waiting for statements"],
-      ["Reconcile", "idle", "Waiting for normalized files"],
-      ["Exception", "idle", "Waiting for match buckets"],
-      ["Summary", "idle", "Waiting for review output"]
-    ],
-    "Needs input": [
-      ["Intake", "blocked", "Missing source files"],
-      ["Reconcile", "idle", "Waiting for normalized files"],
-      ["Exception", "idle", "Waiting for match buckets"],
-      ["Summary", "idle", "Waiting for review output"]
-    ],
-    Importing: [
-      ["Intake", "active", "Importing ledgers"],
-      ["Reconcile", "idle", "Waiting for normalized files"],
-      ["Exception", "idle", "Waiting for match buckets"],
-      ["Summary", "idle", "Waiting for review output"]
-    ],
-    Parsing: [
-      ["Intake", "active", "Normalizing statement-ledger pairs"],
-      ["Reconcile", "idle", "Waiting for normalized files"],
-      ["Exception", "idle", "Waiting for match buckets"],
-      ["Summary", "idle", "Waiting for review output"]
-    ],
-    Reconciling: [
-      ["Intake", "complete", "Artifacts passed forward"],
-      ["Reconcile", "active", "Matching rows in parallel"],
-      ["Exception", "idle", "Waiting for match buckets"],
-      ["Summary", "idle", "Waiting for review output"]
-    ],
-    "Needs review": [
-      ["Intake", "complete", "Artifacts passed forward"],
-      ["Reconcile", "complete", "Match buckets generated"],
-      ["Exception", "active", "Reviewer decision needed"],
-      ["Summary", "idle", "Waiting for review output"]
-    ],
-    Updating: [
-      ["Intake", "complete", "Artifacts passed forward"],
-      ["Reconcile", "complete", "Match buckets generated"],
-      ["Exception", "complete", "Review package approved"],
-      ["Summary", "active", "Posting records and reports"]
-    ],
-    "Ready for handoff": [
-      ["Intake", "complete", "Artifacts passed forward"],
-      ["Reconcile", "complete", "Match buckets generated"],
-      ["Exception", "complete", "Review package prepared"],
-      ["Summary", "idle", "Waiting for controller handoff"]
-    ],
-    Complete: [
-      ["Intake", "complete", "Artifacts passed forward"],
-      ["Reconcile", "complete", "Match buckets generated"],
-      ["Exception", "complete", "Exceptions flagged"],
-      ["Summary", "complete", "Reports ready"]
-    ]
-  };
-
-  return (templates[status] || templates.Draft).map(([name, statusValue, copy]) => ({
-    name,
-    status: statusValue,
-    copy
-  }));
+function dashboardSessionSummaryMeta(property) {
+  const openItems = property?.openItems ?? 0;
+  const exceptions = property?.exceptions ?? 0;
+  const banksCount = getPropertyBankCount(property);
+  return `${openItems} ${openItems === 1 ? "open item" : "open items"} · ${exceptions} ${
+    exceptions === 1 ? "exception" : "exceptions"
+  } · ${banksCount} ${banksCount === 1 ? "bank" : "banks"}`;
 }
 
-function agentLaneLabel(name) {
-  if (name === "Intake") return "In";
-  if (name === "Reconcile") return "Rec";
-  if (name === "Exception") return "Rev";
-  if (name === "Summary") return "Rpt";
-  return name.slice(0, 3);
+function dashboardReviewHeadline(count) {
+  if (count === 0) return "Close cycle is clear";
+  return `${count} ${count === 1 ? "exception" : "exceptions"} need review`;
+}
+
+function dashboardStalledHandoffCopy(count) {
+  return count === 0 ? "0 stalled" : `${count} stalled`;
 }
 
 function propertyToDraft(property) {
@@ -1755,22 +1702,20 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
   );
 }
 
-function DashboardScreen({ sessions, properties, selectedSession, onOpenSession, onNewSession }) {
-  const selected = sessions.find((session) => session.id === selectedSession) || sessions[0];
-  const selectedProperty =
-    properties.find((property) => property.name === selected?.property) || properties[0];
+function DashboardScreen({ sessions, properties, onOpenSession, onNewSession }) {
   const stats = getDashboardStats(sessions, properties);
   const observabilityMetrics = [
-    { label: "Trace health", value: "Stable", meta: "0 automation issues" },
-    { label: "Active agents", value: stats.activeAgents, meta: `${stats.runningSessions} ${stats.runningSessions === 1 ? "session" : "sessions"} running` },
+    {
+      label: "Needs review",
+      value: stats.reviewItems,
+      meta: stats.reviewItems === 1 ? "exception" : "exceptions",
+      tone: "attention"
+    },
+    { label: "Stalled handoffs", value: dashboardStalledHandoffCopy(stats.stalledHandoffs), meta: "pipeline moving", tone: "good" },
+    { label: "Match rate", value: `${stats.matchRate} ↑`, meta: stats.matchRateTrend, tone: "good" },
+    { label: "Sessions in flight", value: `${stats.runningSessions} of ${sessions.length}`, meta: "active close cycles" },
     { label: "Avg run time", value: "12.4s", meta: "P95 18.1s" },
-    { label: "Human review", value: stats.reviewItems, meta: "open exceptions" }
-  ];
-  const agents = [
-    { name: "Intake", status: stats.intakeActive ? "active" : "complete", metric: "98% parse confidence" },
-    { name: "Reconciliation", status: stats.reconActive ? "active" : "complete", metric: "96% match rate" },
-    { name: "Exception", status: stats.exceptionActive ? "active" : "idle", metric: `${stats.reviewItems} records queued` },
-    { name: "Summary", status: stats.summaryActive ? "active" : "idle", metric: "3 reports ready" }
+    { label: "Trace health", value: "Stable", meta: "0 automation issues", tone: "good" }
   ];
 
   return (
@@ -1778,22 +1723,14 @@ function DashboardScreen({ sessions, properties, selectedSession, onOpenSession,
       <section className="dashboard-observability-strip" aria-label="AI observability summary">
         <div className="dashboard-observability-copy">
           <p className="eyebrow">AI observability</p>
-          <h1>Agent visibility across runs</h1>
+          <h1>{dashboardReviewHeadline(stats.reviewItems)}</h1>
           <p>
-            Trace, handoff, and review health for the close workflow.
+            {stats.runningSessions} of {sessions.length} sessions in flight. Agent handoffs are clear.
           </p>
-          <div className="agent-chip-row" aria-label="Agent runtime status">
-            {agents.map((agent) => (
-              <span className={`agent-visibility-chip ${agent.status}`} key={agent.name}>
-                {agent.status === "active" ? <Loader2 size={13} className="spin" /> : <CircleDot size={13} />}
-                {agent.name}
-              </span>
-            ))}
-          </div>
         </div>
         <div className="dashboard-metric-grid">
           {observabilityMetrics.map((metric) => (
-            <div className="dashboard-metric" key={metric.label}>
+            <div className={`dashboard-metric ${metric.tone || ""}`} key={metric.label}>
               <span>{metric.label}</span>
               <strong>{metric.value}</strong>
               <small>{metric.meta}</small>
@@ -1804,12 +1741,9 @@ function DashboardScreen({ sessions, properties, selectedSession, onOpenSession,
 
       <section className="dashboard-session-workspace" aria-label="Session workspace">
         <div className="dashboard-workspace-head">
-          <div>
-            <p className="eyebrow">Parallel agent workspace</p>
-            <h2>Past sessions and summaries</h2>
-          </div>
-          <button className="primary-button" type="button" onClick={onNewSession}>
-            <Plus size={15} />
+          <h2>Past sessions</h2>
+          <button className="primary-button dashboard-new-session" type="button" onClick={onNewSession}>
+            <Plus size={14} />
             New session
           </button>
         </div>
@@ -1819,16 +1753,15 @@ function DashboardScreen({ sessions, properties, selectedSession, onOpenSession,
             <div className="dashboard-session-columns" aria-hidden="true">
               <span>Session</span>
               <span>Stage</span>
-              <span>Agents</span>
               <span>Summary</span>
+              <span />
             </div>
             <div className="dashboard-session-rows">
               {sessions.map((session) => {
                 const property = properties.find((item) => item.name === session.property);
-                const sessionAgents = getSessionAgents(session.status);
                 return (
                   <button
-                    className={`dashboard-session-row ${session.id === selected?.id ? "selected" : ""}`}
+                    className="dashboard-session-row"
                     key={session.id}
                     type="button"
                     onClick={() => onOpenSession(session)}
@@ -1838,67 +1771,18 @@ function DashboardScreen({ sessions, properties, selectedSession, onOpenSession,
                       <small>{session.cycle} · {property?.accountant || "Unassigned"}</small>
                     </span>
                     <DashboardStatusPill status={session.status} />
-                    <span className="dashboard-agent-pipeline" aria-label={`${session.property} agent stages`}>
-                      {sessionAgents.map((agent) => (
-                        <span className={`dashboard-agent-node ${agent.status}`} key={agent.name}>
-                          <i aria-hidden="true" />
-                          <span>{agentLaneLabel(agent.name)}</span>
-                          <small>{agent.name}</small>
-                        </span>
-                      ))}
+                    <span className="dashboard-session-summary">
+                      <strong>{session.detail}</strong>
+                      <small>{dashboardSessionSummaryMeta(property)}</small>
                     </span>
-                    <span className="dashboard-session-facts">
-                      <strong>{property?.exceptions ?? 0}</strong>
-                      <small>{property?.openItems ?? 0} open · {getPropertyBankCount(property)} banks</small>
+                    <span className="dashboard-session-action" aria-hidden="true">
+                      <ChevronRight size={16} />
                     </span>
                   </button>
                 );
               })}
             </div>
           </div>
-
-          <aside className="dashboard-session-inspector" aria-label="Selected session summary">
-            <div className="dashboard-inspector-head">
-              <p className="eyebrow">Selected session</p>
-              <h3>{selected?.property}</h3>
-              <span>{selected?.cycle} · {selected?.detail}</span>
-            </div>
-            <div className="dashboard-inspector-facts">
-              <div>
-                <span>Banks</span>
-                <strong>{getPropertyBankCount(selectedProperty)}</strong>
-              </div>
-              <div>
-                <span>Tie-out</span>
-                <strong>{shortTieOutLabel(selectedProperty?.tieOut)}</strong>
-              </div>
-              <div>
-                <span>Open items</span>
-                <strong>{selectedProperty?.openItems}</strong>
-              </div>
-              <div>
-                <span>Exceptions</span>
-                <strong>{selectedProperty?.exceptions}</strong>
-              </div>
-            </div>
-            <div className="dashboard-agent-detail-list">
-              {getSessionAgents(selected?.status).map((agent) => (
-                <div className={`dashboard-agent-detail ${agent.status}`} key={agent.name}>
-                  <span>
-                    {agent.status === "active" ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
-                  </span>
-                  <div>
-                    <strong>{agent.name} Agent</strong>
-                    <small>{agent.copy}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button className="soft-button dashboard-open-workspace" type="button" onClick={() => onOpenSession(selected)}>
-              <PlayCircle size={15} />
-              Open workspace
-            </button>
-          </aside>
         </div>
       </section>
     </section>
