@@ -1497,14 +1497,6 @@ function Sidebar({
           Sessions
         </a>
         <a
-          href="#design-system"
-          className={activeView === "design-system" ? "active" : ""}
-          onClick={() => setActiveView("design-system")}
-        >
-          <Sparkles size={16} />
-          Design system
-        </a>
-        <a
           href="#properties"
           className={activeView === "properties" ? "active" : ""}
           onClick={() => setActiveView("properties")}
@@ -1569,13 +1561,41 @@ function Sidebar({
         </div>
       </div>
       <div className="sidebar-footer">
-        <div>
-          <strong>Controls</strong>
-          <span>Prototype mode</span>
+        <div className="system-switch-row">
+          <span>
+            <Sparkles size={14} />
+            System map
+          </span>
+          <a
+            href={activeView === "design-system" ? "#workspace" : "#design-system"}
+            className={`view-switch ${activeView === "design-system" ? "active" : ""}`}
+            role="switch"
+            aria-checked={activeView === "design-system"}
+            aria-label="Toggle system map"
+            onClick={() => setActiveView(activeView === "design-system" ? "workspace" : "design-system")}
+          >
+            <span />
+          </a>
         </div>
-        <button className="icon-button" aria-label="More controls">
-          <MoreHorizontal size={17} />
-        </button>
+        <div className="credits-widget">
+          <div className="credits-row">
+            <span>Credits remaining</span>
+            <strong>5.0k of 5.0k</strong>
+          </div>
+          <div className="credits-meter" aria-hidden="true">
+            <span />
+          </div>
+        </div>
+        <div className="user-profile-row">
+          <div className="user-avatar" aria-hidden="true">AQ</div>
+          <div className="user-profile-copy">
+            <strong>Abdullah Qamar</strong>
+            <span>Owner workspace</span>
+          </div>
+          <button className="icon-button ghost" type="button" aria-label="Account menu">
+            <MoreHorizontal size={17} />
+          </button>
+        </div>
       </div>
     </aside>
   );
