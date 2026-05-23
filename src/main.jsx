@@ -703,6 +703,30 @@ function App() {
     ]);
   }
 
+  function startManualLedgerRun() {
+    if (!canStart) return;
+    const activeBanks = getRunBanks(uploaded);
+    setRunState("reconciling");
+    setBankStage((current) => updateRunBanks(current, activeBanks, "comparing"));
+    setSessions((current) =>
+      current.map((session) =>
+        session.id === selectedSession
+          ? { ...session, status: "Reconciling", detail: "Manual ledgers uploaded" }
+          : session
+      )
+    );
+    setEvents((current) => [
+      ...current,
+      {
+        id: `manual-ledger-${Date.now()}`,
+        type: "user",
+        title: "Ledger uploaded",
+        copy: `${activeBanks.length} ledger${activeBanks.length === 1 ? "" : "s"} added manually`,
+        at: "now"
+      }
+    ]);
+  }
+
   function uploadStatement(bankId) {
     if (runState !== "draft") return;
     const alreadyUploaded = Boolean(uploaded[bankId]);
@@ -926,7 +950,7 @@ function App() {
               <div>
                 <p className="eyebrow">Reconciliation workspace</p>
                 <h1>{selectedProperty.name}</h1>
-                <p className="subtle">Prepare bank statements, import Yardi ledgers, then hand off to the Reconciliation Agent.</p>
+                <p className="subtle">Prepare statements, then reconcile.</p>
                 <label className="cycle-picker">
                   <CalendarDays size={14} />
                   <select value={cycle} onChange={(event) => setCycle(event.target.value)} aria-label="Reconciliation month">
@@ -952,6 +976,7 @@ function App() {
               onUpload={uploadStatement}
               onRemove={removeStatement}
               onStartRun={startRun}
+              onManualLedgerRun={startManualLedgerRun}
               onToggleRow={toggleRow}
               onOpenReview={openReview}
             />
@@ -1362,19 +1387,17 @@ function BankBoard({
   onUpload,
   onRemove,
   onStartRun,
+  onManualLedgerRun,
   onToggleRow,
   onOpenReview
 }) {
   const comparisonMode = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
   const uploadedBanks = banks.filter((bank) => uploaded[bank.id]);
-  const startCopy =
-    uploadedBanks.length === 1
-      ? "1 statement is ready for agent reconciliation"
-      : `${uploadedBanks.length} statements are ready for agent reconciliation`;
+  const readyCopy = `${uploadedBanks.length} statement${uploadedBanks.length === 1 ? "" : "s"} ready`;
   const headingHint =
     runState === "draft"
-      ? "Upload one or more statements to start"
-      : "Uploaded statements stay visible through the run";
+      ? "Upload statements"
+      : "Statements stay visible";
 
   return (
     <section className="bank-board" aria-label="Associated property banks">
@@ -1407,14 +1430,29 @@ function BankBoard({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div>
-            <strong>{startCopy}</strong>
-            <span>Yardi import and parsing will run against the uploaded files.</span>
+          <span className="reconcile-ready-count">{readyCopy}</span>
+          <div className="reconcile-actions">
+            <button
+              className="primary-button"
+              type="button"
+              disabled={!canStart}
+              onClick={onStartRun}
+              aria-label="Start reconciliation using Yardi import"
+            >
+              <Sparkles size={16} />
+              Use Yardi
+            </button>
+            <button
+              className="soft-button ledger-upload-action"
+              type="button"
+              disabled={!canStart}
+              onClick={onManualLedgerRun}
+              aria-label="Upload ledger for manual reconciliation"
+            >
+              <Upload size={16} />
+              Upload ledger
+            </button>
           </div>
-          <button className="primary-button" type="button" disabled={!canStart} onClick={onStartRun}>
-            <Sparkles size={16} />
-            Start reconciliation
-          </button>
         </motion.div>
       )}
 

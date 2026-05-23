@@ -688,34 +688,39 @@ select:disabled {
 }
 
 .reconcile-start-panel {
-  min-height: 50px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface);
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 2px 0 0;
 }
 
-.reconcile-start-panel strong,
-.reconcile-start-panel span {
-  display: block;
-}
-
-.reconcile-start-panel strong {
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
-.reconcile-start-panel span {
-  margin-top: 1px;
+.reconcile-ready-count {
   color: var(--muted);
   font-size: 12px;
-  line-height: 1.35;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.reconcile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reconcile-actions .primary-button,
+.reconcile-actions .soft-button {
+  min-height: 34px;
+}
+
+.ledger-upload-action {
+  background: transparent;
 }
 
 .reconciliation-thread {
