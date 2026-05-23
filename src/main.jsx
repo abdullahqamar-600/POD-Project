@@ -1601,9 +1601,11 @@ function ComparisonBankRow({ bank, records, progress, stage, runState, expanded,
 }
 
 function ComparisonCard({ side, logo, brandClass, title, kicker, meta, count, total }) {
+  const totalLabel = side === "statement" ? "Statement total" : "Ledger total";
+
   return (
     <div className={`comparison-card ${side}`}>
-      <div className="comparison-card-top">
+      <div className="comparison-card-head">
         {logo ? (
           <span className={`mini-bank-logo ${brandClass}`}>
             <img src={logo} alt="" />
@@ -1618,10 +1620,16 @@ function ComparisonCard({ side, logo, brandClass, title, kicker, meta, count, to
           <strong>{title}</strong>
         </div>
       </div>
-      <div className="comparison-card-meta">
-        <span>{meta}</span>
-        <span>{count}</span>
+      <div className="comparison-card-total">
+        <span>{totalLabel}</span>
         <strong>{total}</strong>
+      </div>
+      <div className="comparison-card-meta">
+        <span className="comparison-card-file">
+          <FileText size={12} />
+          {meta}
+        </span>
+        <span>{count}</span>
       </div>
     </div>
   );

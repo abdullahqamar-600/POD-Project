@@ -711,9 +711,12 @@ function ReviewSummarySpecimen({ records }) {
 }
 
 function FinancialSourceCard({ type, title, meta, logo, brandClass, metrics }) {
+  const primaryMetric = metrics.find(([label]) => label === "Total") || metrics[0];
+  const supportingMetrics = metrics.filter(([label]) => label !== primaryMetric[0]);
+
   return (
     <section className="financial-source">
-      <div className="financial-source-top">
+      <div className="financial-source-head">
         {logo ? (
           <span className={`mini-bank-logo ${brandClass}`}>
             <img src={logo} alt="" />
@@ -728,9 +731,16 @@ function FinancialSourceCard({ type, title, meta, logo, brandClass, metrics }) {
           <strong>{title}</strong>
         </div>
       </div>
-      <p>{meta}</p>
+      <div className="financial-source-total">
+        <span>{primaryMetric[0]}</span>
+        <strong>{primaryMetric[1]}</strong>
+      </div>
       <div className="financial-source-metrics">
-        {metrics.map(([label, value]) => (
+        <span className="financial-source-file">
+          <FileText size={12} />
+          {meta}
+        </span>
+        {supportingMetrics.map(([label, value]) => (
           <div key={label}>
             <span>{label}</span>
             <strong>{value}</strong>
