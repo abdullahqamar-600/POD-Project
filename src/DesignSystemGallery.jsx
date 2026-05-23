@@ -10,7 +10,6 @@ import {
   CircleDot,
   Download,
   FileText,
-  History,
   Home,
   Inbox,
   Loader2,
@@ -195,7 +194,7 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
                 </button>
                 <button className="micro-button ghost">
                   <X size={14} />
-                  Not used
+                  Remove
                 </button>
               </ComponentSpec>
 
@@ -397,10 +396,6 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
                     <Building2 size={16} />
                     Properties
                   </a>
-                  <a href="#history">
-                    <History size={16} />
-                    Artifact history
-                  </a>
                 </nav>
                 <div className="sidebar-section ds-session-nav-specimen">
                   <div className="section-label-row">
@@ -482,7 +477,7 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
                   <div className="rail-tabs" role="tablist" aria-label="Rail specimen tabs">
                     <button className="active" type="button" role="tab" aria-selected="true">
                       <Activity size={14} />
-                      Agent work
+                      Run trace
                     </button>
                     <button type="button" role="tab" aria-selected="false">
                       <Settings size={14} />
@@ -492,14 +487,12 @@ export default function DesignSystemGallery({ banks, recordsByBank, runTotals })
                 </div>
                 <div className="rail-body">
                   <section className="rail-section-group">
-                    <div className="rail-section-heading">
-                      <strong>Run state</strong>
-                      <span>8 trace events</span>
-                    </div>
-                    <div className="agent-run-summary">
-                      <span>Current span</span>
-                      <strong>Reconciliation Agent</strong>
-                      <small>Matching statements with Yardi records in parallel.</small>
+                    <div className="agent-run-compact">
+                      <div>
+                        <strong>Reconciliation Agent</strong>
+                        <span>8 events</span>
+                      </div>
+                      <p>Matching statements with Yardi records in parallel.</p>
                     </div>
                   </section>
                   <section className="rail-section-group">
@@ -807,7 +800,7 @@ function RecordSpecimen({ record }) {
   );
 }
 
-function RailAgentSpecimen({ status, name, role, summary, expanded = false, steps = [], metrics = [] }) {
+function RailAgentSpecimen({ status, name, summary, expanded = false, steps = [], metrics = [] }) {
   const StatusIcon = status === "complete" ? CheckCircle2 : status === "active" ? Loader2 : CircleDot;
   const statusLabel = status === "complete" ? "Done" : status === "active" ? "Working" : "Idle";
 
@@ -819,7 +812,6 @@ function RailAgentSpecimen({ status, name, role, summary, expanded = false, step
         </span>
         <span className="agent-heading">
           <strong>{name}</strong>
-          <span>{role}</span>
         </span>
         <span className={`agent-status-pill ${status}`}>{statusLabel}</span>
         <ChevronRight size={14} className={`agent-accordion-chevron ${expanded ? "expanded" : ""}`} />

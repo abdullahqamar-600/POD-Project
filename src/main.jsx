@@ -16,7 +16,6 @@ import {
   ClipboardCheck,
   Download,
   FileText,
-  History,
   Home,
   Inbox,
   Loader2,
@@ -333,6 +332,8 @@ const properties = [
   }
 ];
 
+const cycleOptions = ["April 2026", "May 2026", "June 2026", "July 2026"];
+
 const automationSteps = [
   {
     key: "yardi-queued",
@@ -389,8 +390,8 @@ const automationSteps = [
   {
     key: "artifacts-saved",
     type: "system",
-    title: "Artifact history saved",
-    copy: "Normalized files stored locally",
+    title: "Source artifacts saved",
+    copy: "Normalized files stored for review",
     duration: 900
   },
   {
@@ -416,9 +417,8 @@ function App() {
   const [railOpen, setRailOpen] = useState(true);
   const [manageOpen, setManageOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(properties[0]);
-  const [cycle] = useState("May 2026");
+  const [cycle, setCycle] = useState("May 2026");
   const [uploaded, setUploaded] = useState({});
-  const [excluded, setExcluded] = useState({});
   const [events, setEvents] = useState([
     {
       id: "welcome",
@@ -442,22 +442,24 @@ function App() {
   const [yardiProgress, setYardiProgress] = useState(0);
   const [yardiStepIndex, setYardiStepIndex] = useState(0);
 
-  const includedBanks = banks.filter((bank) => !excluded[bank.id]);
-  const unresolvedBanks = includedBanks.filter((bank) => !uploaded[bank.id]);
-  const canStart =
-    runState === "draft" && includedBanks.length > 0 && unresolvedBanks.length === 0;
+  const uploadedBanks = banks.filter((bank) => uploaded[bank.id]);
+  const runBanks = uploadedBanks.length > 0 ? uploadedBanks : banks;
+  const canStart = runState === "draft" && uploadedBanks.length > 0;
   const reviewBank = banks.find((bank) => bank.id === reviewBankId);
-  const runTotals = getRunTotals(recordsByBank);
+  const runTotals = getRunTotals(recordsByBank, runBanks);
 
   useEffect(() => {
     if (runState !== "running") return;
 
     let cancelled = false;
     let timer;
+    const activeBanks = getRunBanks(uploaded);
+    const activeBankIds = new Set(activeBanks.map((bank) => bank.id));
 
     const run = async () => {
       for (const step of automationSteps) {
         if (cancelled) return;
+        if (step.bankId && !activeBankIds.has(step.bankId)) continue;
         setActiveStep(step);
         setEvents((current) => [
           ...current,
@@ -478,30 +480,30 @@ function App() {
                 : session
             )
           );
-          setBankStage((current) => updateAllIncluded(current, excluded, "ledger-importing"));
+          setBankStage((current) => updateRunBanks(current, activeBanks, "ledger-importing"));
         }
 
         if (step.key === "ledgers-found") {
-          setBankStage((current) => updateAllIncluded(current, excluded, "ledger-imported"));
+          setBankStage((current) => updateRunBanks(current, activeBanks, "ledger-imported"));
         }
 
         if (step.key === "parsing-started") {
           setSessions((current) =>
             current.map((session) =>
               session.id === selectedSession
-                ? { ...session, status: "Parsing", detail: "3 pairs normalizing" }
+                ? { ...session, status: "Parsing", detail: `${activeBanks.length} pairs normalizing` }
                 : session
             )
           );
-          setBankStage((current) => updateAllIncluded(current, excluded, "parsing"));
+          setBankStage((current) => updateRunBanks(current, activeBanks, "parsing"));
         }
 
-        if (step.bankId) {
+        if (step.bankId && activeBankIds.has(step.bankId)) {
           setBankStage((current) => ({ ...current, [step.bankId]: "normalizing" }));
         }
 
         if (step.key === "artifacts-saved") {
-          setBankStage((current) => updateAllIncluded(current, excluded, "normalized"));
+          setBankStage((current) => updateRunBanks(current, activeBanks, "normalized"));
         }
 
         if (step.key === "handoff") {
@@ -513,7 +515,7 @@ function App() {
                 : session
             )
           );
-          setBankStage((current) => updateAllIncluded(current, excluded, "scanning"));
+          setBankStage((current) => updateRunBanks(current, activeBanks, "scanning"));
         }
 
         await new Promise((resolve) => {
@@ -528,13 +530,14 @@ function App() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [excluded, runState, selectedSession]);
+  }, [runState, selectedSession, uploaded]);
 
   useEffect(() => {
     if (runState !== "reconciling") return;
 
+    const activeBanks = getRunBanks(uploaded);
     setComparisonProgress(Object.fromEntries(banks.map((bank) => [bank.id, 0])));
-    setBankStage((current) => updateAllIncluded(current, excluded, "comparing"));
+    setBankStage((current) => updateRunBanks(current, activeBanks, "comparing"));
     setActiveStep({
       key: "comparison",
       type: "agent",
@@ -554,25 +557,24 @@ function App() {
 
     const progressTimer = window.setInterval(() => {
       setComparisonProgress((current) =>
-        banks.reduce(
+        activeBanks.reduce(
           (next, bank, index) => ({
             ...next,
-            [bank.id]: excluded[bank.id]
-              ? 0
-              : Math.min(96, (current[bank.id] || 0) + 7 + index)
+            [bank.id]: Math.min(96, (current[bank.id] || 0) + 7 + index)
           }),
-          {}
+          current
         )
       );
     }, 420);
 
     const finishTimer = window.setTimeout(() => {
-      const totals = getRunTotals(recordsByBank);
-      const includedAtFinish = banks.filter((bank) => !excluded[bank.id]);
-      setComparisonProgress(Object.fromEntries(banks.map((bank) => [bank.id, 100])));
+      const totals = getRunTotals(recordsByBank, activeBanks);
+      setComparisonProgress((current) =>
+        activeBanks.reduce((next, bank) => ({ ...next, [bank.id]: 100 }), current)
+      );
       setRunState("review");
-      setRowExpanded(Object.fromEntries(includedAtFinish.map((bank) => [bank.id, true])));
-      setBankStage((current) => updateAllIncluded(current, excluded, "review"));
+      setRowExpanded(Object.fromEntries(activeBanks.map((bank) => [bank.id, true])));
+      setBankStage((current) => updateRunBanks(current, activeBanks, "review"));
       setSessions((current) =>
         current.map((session) =>
           session.id === selectedSession
@@ -606,11 +608,12 @@ function App() {
       window.clearInterval(progressTimer);
       window.clearTimeout(finishTimer);
     };
-  }, [excluded, recordsByBank, runState, selectedSession]);
+  }, [recordsByBank, runState, selectedSession, uploaded]);
 
   useEffect(() => {
     if (runState !== "updating-yardi") return;
 
+    const activeBanks = getRunBanks(uploaded);
     setYardiProgress(0);
     setYardiStepIndex(0);
     setActiveStep({
@@ -645,11 +648,11 @@ function App() {
     }, 460);
 
     const finishTimer = window.setTimeout(() => {
-      const totals = getRunTotals(recordsByBank);
+      const totals = getRunTotals(recordsByBank, activeBanks);
       setYardiProgress(100);
       setYardiStepIndex(yardiUpdateSteps.length - 1);
       setRunState("complete");
-      setBankStage((current) => updateAllIncluded(current, excluded, "complete"));
+      setBankStage((current) => updateRunBanks(current, activeBanks, "complete"));
       setSessions((current) =>
         current.map((session) =>
           session.id === selectedSession
@@ -683,7 +686,7 @@ function App() {
       window.clearInterval(progressTimer);
       window.clearTimeout(finishTimer);
     };
-  }, [excluded, recordsByBank, runState, selectedSession]);
+  }, [recordsByBank, runState, selectedSession, uploaded]);
 
   function startRun() {
     if (!canStart) return;
@@ -693,8 +696,8 @@ function App() {
       {
         id: `start-${Date.now()}`,
         type: "user",
-        title: "Start Reconcile from Yardi",
-        copy: "Inputs locked for this session",
+        title: "Reconciliation started",
+        copy: `${uploadedBanks.length} statement${uploadedBanks.length === 1 ? "" : "s"} locked for this session`,
         at: "now"
       }
     ]);
@@ -702,6 +705,7 @@ function App() {
 
   function uploadStatement(bankId) {
     if (runState !== "draft") return;
+    const alreadyUploaded = Boolean(uploaded[bankId]);
     setUploaded((current) => ({ ...current, [bankId]: true }));
     setBankStage((current) => ({ ...current, [bankId]: "statement-ready" }));
     const bank = banks.find((item) => item.id === bankId);
@@ -710,30 +714,29 @@ function App() {
       {
         id: `upload-${bankId}-${Date.now()}`,
         type: "user",
-        title: "Statement uploaded",
+        title: alreadyUploaded ? "Statement replaced" : "Statement uploaded",
         copy: bank.name,
         at: "now"
       }
     ]);
   }
 
-  function markNotUsed(bankId) {
+  function removeStatement(bankId) {
     if (runState !== "draft") return;
-    setExcluded((current) => ({ ...current, [bankId]: !current[bankId] }));
     setUploaded((current) => {
       const next = { ...current };
       delete next[bankId];
       return next;
     });
-    setBankStage((current) => ({ ...current, [bankId]: "excluded" }));
+    setBankStage((current) => ({ ...current, [bankId]: "waiting" }));
     const bank = banks.find((item) => item.id === bankId);
     setEvents((current) => [
       ...current,
       {
-        id: `exclude-${bankId}-${Date.now()}`,
-        type: "system",
-        title: "Bank marked not used",
-        copy: bank.name,
+        id: `remove-${bankId}-${Date.now()}`,
+        type: "user",
+        title: "Statement removed",
+        copy: `${bank.name} can be re-uploaded`,
         at: "now"
       }
     ]);
@@ -878,7 +881,6 @@ function App() {
     setSelectedSession(id);
     setActiveView("workspace");
     setUploaded({});
-    setExcluded({});
     setRowExpanded({});
     setRecordsByBank(createRecordState());
     setComparisonProgress(Object.fromEntries(banks.map((bank) => [bank.id, 0])));
@@ -908,6 +910,7 @@ function App() {
         onNewSession={createSession}
         activeView={activeView}
         setActiveView={setActiveView}
+        onOpenProperties={() => setManageOpen(true)}
       />
       <main className={`workspace ${activeView === "design-system" ? "design-system-workspace" : ""}`}>
         <TopBar
@@ -924,63 +927,41 @@ function App() {
                 <p className="eyebrow">Reconciliation workspace</p>
                 <h1>{selectedProperty.name}</h1>
                 <p className="subtle">Prepare bank statements, import Yardi ledgers, then hand off to the Reconciliation Agent.</p>
-                <div className="cycle-line">
+                <label className="cycle-picker">
                   <CalendarDays size={14} />
-                  <span>{cycle}</span>
-                </div>
-              </div>
-              <div className="header-actions">
-                <button className="soft-button" onClick={() => setManageOpen(true)}>
-                  <Settings size={16} />
-                  Manage properties
-                </button>
-                <button
-                  className={`primary-button ${runState !== "draft" ? "is-running" : ""}`}
-                  disabled={!canStart}
-                  onClick={startRun}
-                >
-                  {runState === "draft" ? (
-                    <Sparkles size={16} />
-                  ) : runState === "complete" ? (
-                    <CheckCircle2 size={16} />
-                  ) : (
-                    <Loader2 size={16} className="spin" />
-                  )}
-                  {runState === "draft"
-                    ? "Start Reconcile from Yardi"
-                    : runState === "running"
-                      ? "Importing and parsing"
-                      : runState === "reconciling"
-                        ? "Reconciling"
-                        : runState === "review"
-                          ? "Review ready"
-                          : runState === "updating-yardi"
-                            ? "Updating Yardi"
-                            : "Complete"}
-                </button>
+                  <select value={cycle} onChange={(event) => setCycle(event.target.value)} aria-label="Reconciliation month">
+                    {cycleOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </div>
 
-            <ProcessStatus
-              runState={runState}
-              runTotals={runTotals}
-              yardiProgress={yardiProgress}
-              yardiStepIndex={yardiStepIndex}
-            />
-
             <BankBoard
               uploaded={uploaded}
-              excluded={excluded}
               bankStage={bankStage}
               activeStep={activeStep}
               runState={runState}
               recordsByBank={recordsByBank}
               comparisonProgress={comparisonProgress}
               rowExpanded={rowExpanded}
+              canStart={canStart}
               onUpload={uploadStatement}
-              onExclude={markNotUsed}
+              onRemove={removeStatement}
+              onStartRun={startRun}
               onToggleRow={toggleRow}
               onOpenReview={openReview}
+            />
+
+            <ProcessStatus
+              runState={runState}
+              cycle={cycle}
+              runTotals={runTotals}
+              yardiProgress={yardiProgress}
+              yardiStepIndex={yardiStepIndex}
             />
 
             {runState === "review" && (
@@ -1023,22 +1004,21 @@ function App() {
   );
 }
 
-function updateAllIncluded(current, excluded, stage) {
-  return banks.reduce(
-    (acc, bank) => ({
-      ...acc,
-      [bank.id]: excluded[bank.id] ? "excluded" : stage
-    }),
-    current
-  );
+function getRunBanks(uploaded) {
+  const uploadedBanks = banks.filter((bank) => uploaded[bank.id]);
+  return uploadedBanks.length > 0 ? uploadedBanks : banks;
+}
+
+function updateRunBanks(current, runBanks, stage) {
+  return runBanks.reduce((acc, bank) => ({ ...acc, [bank.id]: stage }), current);
 }
 
 function createRecordState() {
   return JSON.parse(JSON.stringify(reconciliationSeed));
 }
 
-function getRunTotals(recordsByBank) {
-  return banks.reduce(
+function getRunTotals(recordsByBank, sourceBanks = banks) {
+  return sourceBanks.reduce(
     (totals, bank) => {
       const records = recordsByBank[bank.id];
       return {
@@ -1068,7 +1048,7 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
   const intakeTimeline = [
     { title: "Yardi ledgers found", copy: "Ledger files paired with uploaded statements" },
     { title: "Statement fields normalized", copy: "Dates, deposits, withdrawals, and balances aligned" },
-    { title: "Source artifacts saved", copy: "Clean inputs stored in artifact history" },
+    { title: "Source artifacts saved", copy: "Clean inputs stored for review" },
     { title: "Handoff prepared", copy: "Normalized artifacts sent to reconciliation" }
   ];
   const intakeVisibleCount =
@@ -1212,7 +1192,8 @@ function Sidebar({
   setSelectedSession,
   onNewSession,
   activeView,
-  setActiveView
+  setActiveView,
+  onOpenProperties
 }) {
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
   const [sessionQuery, setSessionQuery] = useState("");
@@ -1262,14 +1243,10 @@ function Sidebar({
           <Sparkles size={16} />
           Design system
         </button>
-        <a href="#properties">
+        <button type="button" onClick={onOpenProperties}>
           <Building2 size={16} />
           Properties
-        </a>
-        <a href="#history">
-          <History size={16} />
-          Artifact history
-        </a>
+        </button>
       </nav>
       <div className="sidebar-section">
         <div className="section-label-row">
@@ -1375,53 +1352,94 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
 
 function BankBoard({
   uploaded,
-  excluded,
   bankStage,
   activeStep,
   runState,
   recordsByBank,
   comparisonProgress,
   rowExpanded,
+  canStart,
   onUpload,
-  onExclude,
+  onRemove,
+  onStartRun,
   onToggleRow,
   onOpenReview
 }) {
   const comparisonMode = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
+  const uploadedBanks = banks.filter((bank) => uploaded[bank.id]);
+  const startCopy =
+    uploadedBanks.length === 1
+      ? "1 statement is ready for agent reconciliation"
+      : `${uploadedBanks.length} statements are ready for agent reconciliation`;
 
   return (
     <section className="bank-board" aria-label="Associated property banks">
       <div className="board-heading">
         <div>
           <p className="eyebrow">Associated banks</p>
-          <h2>{comparisonMode ? "Reconciliation workspace" : "Statement workspace"}</h2>
+          <h2>Statement workspace</h2>
         </div>
-        <span>
-          {comparisonMode
-            ? "Bank statement and Yardi ledger stay paired through review"
-            : "All property banks must be resolved"}
-        </span>
+        <span>Upload one or more statements to start</span>
       </div>
-      <div className={`bank-grid ${comparisonMode ? "comparison-list" : ""}`}>
+      <div className="bank-grid statement-list">
         {banks.map((bank) => (
           <BankTile
             key={bank.id}
             bank={bank}
             uploaded={uploaded[bank.id]}
-            excluded={excluded[bank.id]}
             stage={bankStage[bank.id]}
             active={activeStep?.bankId === bank.id || bankStage[bank.id] === "scanning"}
             runState={runState}
-            records={recordsByBank[bank.id]}
-            progress={comparisonProgress[bank.id] || 0}
-            expanded={rowExpanded[bank.id]}
             onUpload={() => onUpload(bank.id)}
-            onExclude={() => onExclude(bank.id)}
-            onToggle={() => onToggleRow(bank.id)}
-            onOpenReview={() => onOpenReview(bank.id)}
+            onRemove={() => onRemove(bank.id)}
           />
         ))}
       </div>
+
+      {runState === "draft" && uploadedBanks.length > 0 && (
+        <motion.div
+          className="reconcile-start-panel"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div>
+            <strong>{startCopy}</strong>
+            <span>Yardi import and parsing will run against the uploaded files.</span>
+          </div>
+          <button className="primary-button" type="button" disabled={!canStart} onClick={onStartRun}>
+            <Sparkles size={16} />
+            Start reconciliation
+          </button>
+        </motion.div>
+      )}
+
+      {comparisonMode && uploadedBanks.length > 0 && (
+        <section className="reconciliation-thread" aria-label="Reconciliation results">
+          <div className="board-heading compact">
+            <div>
+              <p className="eyebrow">Agent output</p>
+              <h2>Reconciliation workspace</h2>
+            </div>
+            <span>Statement and Yardi ledger stay paired through review</span>
+          </div>
+          <div className="bank-grid comparison-list">
+            {uploadedBanks.map((bank) => (
+              <ComparisonBankRow
+                key={bank.id}
+                bank={bank}
+                records={recordsByBank[bank.id]}
+                progress={comparisonProgress[bank.id] || 0}
+                stage={bankStage[bank.id]}
+                runState={runState}
+                expanded={rowExpanded[bank.id]}
+                onToggle={() => onToggleRow(bank.id)}
+                onOpenReview={() => onOpenReview(bank.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </section>
   );
 }
@@ -1429,47 +1447,21 @@ function BankBoard({
 function BankTile({
   bank,
   uploaded,
-  excluded,
   stage,
   active,
   runState,
-  records,
-  progress,
-  expanded,
   onUpload,
-  onExclude,
-  onToggle,
-  onOpenReview
+  onRemove
 }) {
-  const comparisonMode = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
-
-  if (comparisonMode) {
-    return (
-      <ComparisonBankRow
-        bank={bank}
-        records={records}
-        progress={progress}
-        stage={stage}
-        runState={runState}
-        expanded={expanded}
-        onToggle={onToggle}
-        onOpenReview={onOpenReview}
-      />
-    );
-  }
-
   const locked = runState !== "draft";
-  const uploadActionLabel = excluded
-    ? "Statement skipped"
-    : uploaded || locked
-      ? "Statement locked"
-      : "Upload statement";
-  const UploadActionIcon = excluded || uploaded || locked ? Lock : Upload;
+  const hasFile = Boolean(uploaded);
+  const uploadActionLabel = hasFile ? (locked ? "Statement locked" : "Replace file") : locked ? "No file uploaded" : "Upload statement";
+  const UploadActionIcon = locked && hasFile ? Lock : hasFile ? RefreshCw : Upload;
 
   return (
     <motion.article
       layout
-      className={`bank-tile ${active ? "active" : ""} ${excluded ? "excluded" : ""}`}
+      className={`bank-tile ${active ? "active" : ""} ${hasFile ? "uploaded" : ""}`}
       whileHover={{ y: -1 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
     >
@@ -1478,20 +1470,24 @@ function BankTile({
         <div className={`bank-logo ${bank.brandClass}`} aria-hidden="true">
           <img src={bank.logo} alt="" />
         </div>
-        <div>
+        <div className="bank-identity">
           <strong>{bank.shortName}</strong>
           <span>{bank.type}</span>
         </div>
-        <StageBadge stage={stage} excluded={excluded} />
-        <button className="micro-button" disabled={locked || excluded || uploaded} onClick={onUpload}>
-          <UploadActionIcon size={14} />
-          {uploadActionLabel}
-        </button>
-        <button className="micro-button ghost" disabled={locked} onClick={onExclude}>
-          {excluded ? <RefreshCw size={14} /> : <X size={14} />}
-          {excluded ? "Include" : "Not used"}
-        </button>
-        {uploaded && <SummaryHover bank={bank} kind="statement" />}
+        <StageBadge stage={hasFile ? stage : "waiting"} />
+        <div className="statement-actions">
+          <button className="micro-button" disabled={locked} onClick={onUpload}>
+            <UploadActionIcon size={14} />
+            {uploadActionLabel}
+          </button>
+          {hasFile && !locked && (
+            <button className="micro-button ghost" type="button" onClick={onRemove}>
+              <X size={14} />
+              Remove
+            </button>
+          )}
+          {hasFile && <SummaryHover bank={bank} kind="statement" />}
+        </div>
       </div>
     </motion.article>
   );
@@ -1678,8 +1674,7 @@ function SummaryHover({ bank, kind }) {
   );
 }
 
-function StageBadge({ stage, excluded }) {
-  if (excluded) return <span className="stage-badge muted">Skipped</span>;
+function StageBadge({ stage }) {
   const label =
     {
       waiting: "Missing",
@@ -1703,8 +1698,7 @@ function StageBadge({ stage, excluded }) {
   );
 }
 
-function stageLabel(stage, uploaded, excluded) {
-  if (excluded) return "Ledger not required";
+function stageLabel(stage, uploaded) {
   if (!uploaded) return "Ledger waits for statement";
   if (stage === "statement-ready") return "Yardi ledger pending";
   if (stage === "ledger-importing") return "Importing from Yardi";
@@ -1719,7 +1713,7 @@ function stageLabel(stage, uploaded, excluded) {
   return "Yardi ledger pending";
 }
 
-function ProcessStatus({ runState, runTotals, yardiProgress, yardiStepIndex }) {
+function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepIndex }) {
   if (!["reconciling", "review", "updating-yardi", "complete"].includes(runState)) return null;
 
   if (runState === "complete") {
@@ -1732,7 +1726,7 @@ function ProcessStatus({ runState, runTotals, yardiProgress, yardiStepIndex }) {
       >
         <div className="final-summary-copy">
           <p className="eyebrow">Summary and Reports Agent</p>
-          <h2>May reconciliation is ready for controller review</h2>
+          <h2>{cycle} reconciliation is ready for controller review</h2>
           <p>Approved records were posted to Yardi and remaining exceptions were flagged for review.</p>
         </div>
         <div className="final-metrics">
@@ -2144,7 +2138,7 @@ function ObservabilityRail({
                 onClick={() => setRailTab("agent-work")}
               >
                 <Activity size={14} />
-                Agent work
+                Run trace
               </button>
               <button
                 type="button"
@@ -2162,14 +2156,12 @@ function ObservabilityRail({
             {railTab === "agent-work" ? (
               <>
                 <section className="rail-section-group">
-                  <div className="rail-section-heading">
-                    <strong>Run state</strong>
-                    <span>{events.length} trace events</span>
-                  </div>
-                  <div className="agent-run-summary">
-                    <span>Current span</span>
-                    <strong>{focusAgent?.name || "Waiting for agent work"}</strong>
-                    <small>{focusAgent?.latest || "The run will begin after the statements are ready."}</small>
+                  <div className="agent-run-compact">
+                    <div>
+                      <strong>{focusAgent?.name || "Waiting"}</strong>
+                      <span>{events.length} events</span>
+                    </div>
+                    <p>{focusAgent?.latest || "Upload a statement to start."}</p>
                   </div>
                 </section>
                 <section className="rail-section-group">
@@ -2218,7 +2210,6 @@ function AgentRailAccordion({ agent, expanded, onToggle }) {
         </span>
         <span className="agent-heading">
           <strong>{agent.name}</strong>
-          <span>{agent.role}</span>
         </span>
         <span className={`agent-status-pill ${agent.status}`}>{agentStatusLabel(agent.status)}</span>
         <ChevronRight size={14} className={`agent-accordion-chevron ${expanded ? "expanded" : ""}`} />
