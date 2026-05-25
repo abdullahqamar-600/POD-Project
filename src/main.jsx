@@ -10,14 +10,19 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Check,
   CheckCircle2,
+  CircleAlert,
+  CircleDashed,
   CircleDot,
+  CircleDotDashed,
   ClipboardCheck,
   Download,
   FileText,
   FileSpreadsheet,
   Home,
   Inbox,
+  LayoutDashboard,
   Loader2,
   MessageCircle,
   MoreHorizontal,
@@ -34,7 +39,6 @@ import {
   Sparkles,
   Trash2,
   Upload,
-  Workflow,
   X
 } from "lucide-react";
 import "./styles.css";
@@ -42,8 +46,6 @@ import bankOfAmericaLogo from "../company logos/bank-of-america-logo 1.png";
 import chaseLogo from "../company logos/Chase-National-Bank-Logo 1.png";
 import wellsFargoLogo from "../company logos/Wells_Fargo_Bank.svg 1.png";
 import statementFileIcon from "../File SVG/File Icon.svg";
-import statementUploadIcon from "../File SVG/Upload BUtton.svg";
-import statementUploadedIcon from "../File SVG/Uploaded Check Icon.svg";
 
 const banks = [
   {
@@ -98,6 +100,16 @@ const banks = [
     type: "Deposits"
   }
 ];
+
+const statementScanStages = new Set(["scanning"]);
+
+const agentIconMap = {
+  intake: Inbox,
+  reconciliation: ArrowRightLeft,
+  exceptions: AlertTriangle,
+  summary: ClipboardCheck,
+  posting: ClipboardCheck
+};
 
 const reconciliationSeed = {
   chase: {
@@ -317,7 +329,7 @@ const propertySeed = [
     id: "meridian",
     code: "MER-1849",
     name: "The Meridian",
-    address: "1849 Westlake Ave",
+    address: "1849 Westlake Ave N, Seattle, WA 98109",
     market: "Seattle",
     type: "Multifamily",
     units: 214,
@@ -340,7 +352,7 @@ const propertySeed = [
     id: "oakline",
     code: "OAK-0022",
     name: "Oakline Lofts",
-    address: "22 North Canal",
+    address: "22 North Canal Street, Portland, OR 97209",
     market: "Portland",
     type: "Mixed-use",
     units: 88,
@@ -362,7 +374,7 @@ const propertySeed = [
     id: "harbor",
     code: "HBR-0710",
     name: "Harbor Court",
-    address: "710 Bay Street",
+    address: "710 Bay Street, San Diego, CA 92101",
     market: "San Diego",
     type: "Commercial",
     units: 132,
@@ -386,7 +398,7 @@ const propertySeed = [
     id: "northstar",
     code: "NOR-0880",
     name: "Northstar Plaza",
-    address: "880 Glacier Road",
+    address: "880 Glacier Road, Denver, CO 80202",
     market: "Denver",
     type: "Retail",
     units: 64,
@@ -427,14 +439,14 @@ const automationSteps = [
   {
     key: "yardi-queued",
     type: "system",
-    title: "ERD ledger extraction requested",
+    title: "Yardi ledger extraction requested",
     copy: "Secure login automation queued",
     duration: 900
   },
   {
     key: "yardi-login",
     type: "system",
-    title: "ERD session running",
+    title: "Yardi session running",
     copy: "Opening property ledger search",
     duration: 1100
   },
@@ -525,7 +537,6 @@ function App() {
   const [comparisonProgress, setComparisonProgress] = useState(
     Object.fromEntries(banks.map((bank) => [bank.id, 0]))
   );
-  const [rowExpanded, setRowExpanded] = useState({});
   const [recordsByBank, setRecordsByBank] = useState(createRecordState);
   const [reviewBankId, setReviewBankId] = useState(null);
   const [yardiProgress, setYardiProgress] = useState(0);
@@ -582,7 +593,7 @@ function App() {
           setSessions((current) =>
             current.map((session) =>
               session.id === selectedSession
-                ? { ...session, status: "Importing", detail: "ERD extraction queued" }
+                ? { ...session, status: "Importing", detail: "Yardi extraction queued" }
                 : session
             )
           );
@@ -617,11 +628,11 @@ function App() {
           setSessions((current) =>
             current.map((session) =>
               session.id === selectedSession
-                ? { ...session, status: "Reconciling", detail: "Scanning normalized inputs" }
+                ? { ...session, status: "Reconciling", detail: "Comparing normalized inputs" }
                 : session
             )
           );
-          setBankStage((current) => updateRunBanks(current, activeBanks, "scanning"));
+          setBankStage((current) => updateRunBanks(current, activeBanks, "comparing"));
         }
 
         await new Promise((resolve) => {
@@ -648,7 +659,7 @@ function App() {
       key: "comparison",
       type: "agent",
       title: "Reconciliation Agent comparing ledgers",
-      copy: "Matching statements with ERD ledger records in parallel"
+      copy: "Matching statements with Yardi ledger records in parallel"
     });
     setEvents((current) => [
       ...current,
@@ -679,7 +690,6 @@ function App() {
         activeBanks.reduce((next, bank) => ({ ...next, [bank.id]: 100 }), current)
       );
       setRunState("review");
-      setRowExpanded(Object.fromEntries(activeBanks.map((bank) => [bank.id, true])));
       setBankStage((current) => updateRunBanks(current, activeBanks, "review"));
       setSessions((current) =>
         current.map((session) =>
@@ -796,7 +806,9 @@ function App() {
 
   function startRun() {
     if (!canStart) return;
+    const activeBanks = getRunBanks(uploaded);
     setRunState("running");
+    setBankStage((current) => updateRunBanks(current, activeBanks, "ledger-importing"));
     setEvents((current) => [
       ...current,
       {
@@ -835,17 +847,16 @@ function App() {
 
   function uploadStatement(bankId) {
     if (runState !== "draft") return;
-    if (bankStage[bankId] === "scanning") return;
+    if (bankStage[bankId] === "uploading" || statementScanStages.has(bankStage[bankId])) return;
     const alreadyUploaded = Boolean(uploaded[bankId]);
-    setUploaded((current) => ({ ...current, [bankId]: true }));
-    setBankStage((current) => ({ ...current, [bankId]: "scanning" }));
     const bank = banks.find((item) => item.id === bankId);
+    setBankStage((current) => ({ ...current, [bankId]: "uploading" }));
     setActiveStep({
-      key: "statement-scan",
+      key: "statement-upload",
       type: "agent",
       bankId,
-      title: "Intake scanning statement",
-      copy: `Reading ${bank.shortName} statement and extracting fields`
+      title: "Intake Agent processing statement",
+      copy: `Uploading and reading ${bank.shortName} statement`
     });
     setEvents((current) => [
       ...current,
@@ -858,11 +869,12 @@ function App() {
       }
     ]);
     window.setTimeout(() => {
+      setUploaded((current) => ({ ...current, [bankId]: true }));
       setBankStage((current) => ({ ...current, [bankId]: "statement-ready" }));
       setActiveStep((current) =>
-        current?.key === "statement-scan" && current.bankId === bankId ? null : current
+        current?.key === "statement-upload" && current.bankId === bankId ? null : current
       );
-    }, 1500);
+    }, 620);
   }
 
   function removeStatement(bankId) {
@@ -874,7 +886,7 @@ function App() {
     });
     setBankStage((current) => ({ ...current, [bankId]: "waiting" }));
     setActiveStep((current) =>
-      current?.key === "statement-scan" && current.bankId === bankId ? null : current
+      ["statement-upload", "statement-scan"].includes(current?.key) && current.bankId === bankId ? null : current
     );
     const bank = banks.find((item) => item.id === bankId);
     setEvents((current) => [
@@ -887,11 +899,6 @@ function App() {
         at: "now"
       }
     ]);
-  }
-
-  function toggleRow(bankId) {
-    if (!["review", "updating-yardi", "complete"].includes(runState)) return;
-    setRowExpanded((current) => ({ ...current, [bankId]: !current[bankId] }));
   }
 
   function openReview(bankId) {
@@ -1044,7 +1051,6 @@ function App() {
     setNewSessionOpen(false);
     setActiveView("workspace");
     setUploaded({});
-    setRowExpanded({});
     setRecordsByBank(createRecordState());
     setComparisonProgress(Object.fromEntries(banks.map((bank) => [bank.id, 0])));
     setReviewBankId(null);
@@ -1138,13 +1144,11 @@ function App() {
               runState={runState}
               recordsByBank={recordsByBank}
               comparisonProgress={comparisonProgress}
-              rowExpanded={rowExpanded}
               canStart={canStart}
               onUpload={uploadStatement}
               onRemove={removeStatement}
               onStartRun={startRun}
               onManualLedgerRun={startManualLedgerRun}
-              onToggleRow={toggleRow}
               onOpenReview={openReview}
             />
 
@@ -1154,11 +1158,8 @@ function App() {
               runTotals={runTotals}
               yardiProgress={yardiProgress}
               yardiStepIndex={yardiStepIndex}
+              onSubmit={startYardiUpdate}
             />
-
-            {runState === "review" && (
-              <ReviewSubmitBar runTotals={runTotals} onSubmit={startYardiUpdate} />
-            )}
           </section>
         ) : (
           <PropertiesScreen
@@ -1182,6 +1183,7 @@ function App() {
           activeStep={activeStep}
           yardiProgress={yardiProgress}
           yardiStepIndex={yardiStepIndex}
+          onSubmit={startYardiUpdate}
         />
       )}
 
@@ -1222,6 +1224,49 @@ function getPropertyBankCount(property) {
 function formatBankNames(property) {
   if (!Array.isArray(property?.banks)) return "";
   return property.banks.map((bank) => `${bank.name} ${bank.type}`).join(", ");
+}
+
+function getAssociatedBankNames(property) {
+  if (!Array.isArray(property?.banks)) return [];
+  return [...new Set(property.banks.map((bank) => bank.name))];
+}
+
+function formatAssociatedBanks(property) {
+  return getAssociatedBankNames(property).join(", ");
+}
+
+function getBankVisual(bankName) {
+  if (bankName === "Chase") return { logo: chaseLogo, brandClass: "chase" };
+  if (bankName === "Wells Fargo") return { logo: wellsFargoLogo, brandClass: "wells" };
+  if (bankName === "BofA") return { logo: bankOfAmericaLogo, brandClass: "boa" };
+  return { logo: null, brandClass: "" };
+}
+
+function getAssociatedBankSummaries(property) {
+  if (!Array.isArray(property?.banks)) return [];
+  const grouped = property.banks.reduce((map, bank) => {
+    const current = map.get(bank.name) || {
+      name: bank.name,
+      types: [],
+      accounts: 0,
+      ...getBankVisual(bank.name)
+    };
+    return map.set(bank.name, {
+      ...current,
+      types: [...new Set([...current.types, bank.type])],
+      accounts: current.accounts + 1
+    });
+  }, new Map());
+  return [...grouped.values()];
+}
+
+function formatBankCoverageSummary(property) {
+  if (!Array.isArray(property?.banks)) return "";
+  const bankCount = getAssociatedBankNames(property).length;
+  const accountCount = getPropertyBankCount(property);
+  return `${bankCount} ${bankCount === 1 ? "bank" : "banks"} · ${accountCount} linked ${
+    accountCount === 1 ? "account" : "accounts"
+  }`;
 }
 
 function shortTieOutLabel(value) {
@@ -1309,12 +1354,13 @@ function createEmptyPropertyDraft(index) {
 }
 
 function propertyFromDraft(draft, existingId) {
-  const name = draft.name.trim() || "Untitled property";
+  const address = draft.address.trim();
+  const name = draft.name.trim() || address || "Untitled property";
   return {
     id: existingId || `${slugify(name)}-${Date.now()}`,
     code: draft.code.trim() || slugify(name).toUpperCase(),
     name,
-    address: draft.address.trim(),
+    address,
     market: draft.market.trim(),
     type: draft.type.trim(),
     units: Number(draft.units) || 0,
@@ -1377,22 +1423,23 @@ function getRunTotals(recordsByBank, sourceBanks = banks) {
 function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yardiStepIndex }) {
   const totalRecords = runTotals.approved + runTotals.exceptions;
   const matchRate = totalRecords ? Math.round((runTotals.approved / totalRecords) * 100) : 0;
-  const statementScanActive = activeStep?.key === "statement-scan";
+  const statementIntakeActive = ["statement-upload", "statement-scan"].includes(activeStep?.key);
   const intakeComplete = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
   const reconciliationComplete = ["review", "updating-yardi", "complete"].includes(runState);
   const exceptionComplete = ["updating-yardi", "complete"].includes(runState);
   const postingComplete = runState === "complete";
 
   const intakeStatus =
-    runState === "running" || statementScanActive ? "active" : intakeComplete ? "complete" : "idle";
+    runState === "running" || statementIntakeActive ? "active" : intakeComplete ? "complete" : "idle";
   const reconciliationStatus =
     runState === "reconciling" ? "active" : reconciliationComplete ? "complete" : "idle";
   const exceptionStatus = runState === "review" ? "active" : exceptionComplete ? "complete" : "idle";
-  const postingStatus = runState === "updating-yardi" ? "active" : postingComplete ? "complete" : "idle";
+  const summaryDrafting = runState === "review";
+  const postingStatus = summaryDrafting || runState === "updating-yardi" ? "active" : postingComplete ? "complete" : "idle";
 
   const intakeTimeline = [
     { title: "Statement scanned", copy: "File structure, totals, and fields detected" },
-    { title: "ERD ledger extracted", copy: "Ledger files paired with uploaded statements" },
+    { title: "Yardi ledger extracted", copy: "Ledger files paired with uploaded statements" },
     { title: "Statement fields normalized", copy: "Dates, deposits, withdrawals, and balances aligned" },
     { title: "Source artifacts saved", copy: "Clean inputs stored for review" },
     { title: "Handoff prepared", copy: "Normalized artifacts sent to reconciliation" }
@@ -1401,6 +1448,7 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     {
       "yardi-queued": 1,
       "yardi-login": 1,
+      "statement-upload": 1,
       "statement-scan": 1,
       "ledgers-found": 2,
       "parsing-started": 3,
@@ -1412,7 +1460,7 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     }[activeStep?.key] || 1;
 
   const reconciliationTimeline = [
-    { title: "Comparison spans opened", copy: "Statement rows matched against ERD ledger rows" },
+    { title: "Comparison spans opened", copy: "Statement rows matched against Yardi ledger rows" },
     { title: "Variance checks completed", copy: "Amounts, dates, and references scored in parallel" },
     { title: "Buckets generated", copy: "Approved records and exceptions separated for review" }
   ];
@@ -1423,13 +1471,19 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     { title: "Reviewer guidance captured", copy: "Corrections remain attached to the session output" }
   ];
 
-  const postingTimeline = yardiUpdateSteps.map((step) => ({
-    title: step,
-    copy:
-      step === "Preparing report package"
-        ? "Report artifacts and update log are generated"
-        : "Approved records and exception flags are applied"
-  }));
+  const summaryTimeline = summaryDrafting
+    ? [
+        { title: "Summary outline started", copy: "Approved and exception totals are being shaped for review" },
+        { title: "Controller packet drafted", copy: "Narrative, metrics, and next action are prepared" },
+        { title: "Yardi handoff waiting", copy: "Approved records stay queued until reviewer approval" }
+      ]
+    : yardiUpdateSteps.map((step) => ({
+        title: step,
+        copy:
+          step === "Preparing report package"
+            ? "Report artifacts and update log are generated"
+            : "Approved records and exception flags are applied"
+      }));
 
   return [
     {
@@ -1455,11 +1509,11 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     {
       id: "reconciliation",
       name: "Reconciliation",
-      role: "Matches statement rows to ERD records",
+      role: "Matches statement rows to Yardi records",
       status: reconciliationStatus,
       latest:
         reconciliationStatus === "active"
-          ? activeStep?.copy || "Matching statements with ERD records"
+          ? activeStep?.copy || "Matching statements with Yardi records"
           : reconciliationStatus === "complete"
             ? "Match buckets passed to Exception."
             : "Waiting for normalized artifacts.",
@@ -1493,18 +1547,20 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
       ]
     },
     {
-      id: "posting",
+      id: "summary",
       name: "Summary",
       role: "Applies Yardi updates and builds reports",
       status: postingStatus,
       latest:
-        postingStatus === "active"
-          ? activeStep?.copy || yardiUpdateSteps[yardiStepIndex]
+        summaryDrafting
+          ? "Drafting the review summary from approved records and exceptions."
+          : postingStatus === "active"
+            ? activeStep?.copy || yardiUpdateSteps[yardiStepIndex]
           : postingStatus === "complete"
             ? "Yardi updates and report artifacts are ready."
             : "Waiting for reviewed output.",
       output: "Yardi updates, exception flags, and report artifacts generated.",
-      timeline: timelineForStatus(postingStatus, postingTimeline, Math.max(1, yardiStepIndex + 1)),
+      timeline: timelineForStatus(postingStatus, summaryTimeline, summaryDrafting ? 1 : Math.max(1, yardiStepIndex + 1)),
       metrics: [
         { label: "Duration", value: "5.6s" },
         { label: "Posted records", value: runTotals.approved },
@@ -1532,17 +1588,6 @@ function timelineForStatus(status, timeline, activeCount) {
               : "upcoming"
           : "upcoming"
   }));
-}
-
-function getComparisonCopy(bank, runState, progress, records) {
-  if (runState === "complete") return `${bank.shortName} is included in the final report package`;
-  if (runState === "updating-yardi") return `${bank.shortName} records are being posted and flagged in Yardi`;
-  if (runState === "review") {
-    return `${bank.shortName} summary ready: ${records.approved.length} approved, ${records.exceptions.length} exceptions`;
-  }
-  if (progress < 32) return `Comparing ${bank.shortName} statement totals with Yardi ledger totals`;
-  if (progress < 68) return `Matching ${bank.shortName} amounts, dates, references, and post month`;
-  return `Separating ${bank.shortName} approved records from exceptions`;
 }
 
 function Sidebar({
@@ -1590,7 +1635,7 @@ function Sidebar({
           className={activeView === "dashboard" ? "active" : ""}
           onClick={() => setActiveView("dashboard")}
         >
-          <Inbox size={16} />
+          <LayoutDashboard size={16} />
           Dashboard
         </a>
         <a
@@ -1646,9 +1691,10 @@ function Sidebar({
               className={`session-item ${activeView === "workspace" && session.id === selectedSession ? "selected" : ""}`}
               key={session.id}
               onClick={() => onOpenSession(session)}
+              aria-label={`${session.property}, ${getSessionStatusMeta(session.status).label}`}
             >
+              <SessionStatusIcon status={session.status} />
               <strong>{session.property}</strong>
-              <StatusPill status={session.status} />
             </button>
           ))}
           {visibleSessions.length === 0 && <div className="session-empty">No sessions found</div>}
@@ -1722,7 +1768,7 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
         )}
       </div>
       <div className="topbar-actions">
-        {activeView !== "dashboard" && (
+        {activeView !== "dashboard" && activeView !== "properties" && (
           <span className={`run-dot ${statusClass}`}>
             <Activity size={14} />
             {statusLabel}
@@ -2282,8 +2328,8 @@ function NewSessionLauncher({ open, properties, onClose, onSelectProperty }) {
                   onClick={() => onSelectProperty(property)}
                 >
                   <span>
-                    <strong>{property.name}</strong>
-                    <small>{property.code} · {property.address}</small>
+                    <strong>{property.address}</strong>
+                    <small>{property.code} · {property.market}</small>
                   </span>
                   <span className="session-launcher-meta">
                     <small>{getPropertyBankCount(property)} banks</small>
@@ -2311,6 +2357,7 @@ function PropertiesScreen({
 }) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("view");
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [draft, setDraft] = useState(() => propertyToDraft(selectedProperty));
   const visibleProperties = properties.filter((property) => {
     const needle = query.trim().toLowerCase();
@@ -2321,9 +2368,9 @@ function PropertiesScreen({
       property.address,
       property.market,
       property.owner,
-      property.closeStatus,
-      property.ledgerSource,
-      formatBankNames(property)
+      property.lastReconciled,
+      property.tieOut,
+      formatAssociatedBanks(property)
     ]
       .join(" ")
       .toLowerCase()
@@ -2338,16 +2385,19 @@ function PropertiesScreen({
   function selectProperty(property) {
     onSelectProperty(property);
     setMode("view");
+    setInspectorOpen(true);
   }
 
   function startCreate() {
     setMode("create");
     setDraft(createEmptyPropertyDraft(properties.length + 1));
+    setInspectorOpen(true);
   }
 
   function startEdit() {
     setMode("edit");
     setDraft(propertyToDraft(selectedProperty));
+    setInspectorOpen(true);
   }
 
   function updateDraft(field, value) {
@@ -2363,23 +2413,29 @@ function PropertiesScreen({
       onUpdateProperty(property);
     }
     setMode("view");
+    setInspectorOpen(true);
   }
 
   function removeSelectedProperty() {
     if (properties.length <= 1) return;
     onDeleteProperty(selectedProperty.id);
     setMode("view");
+    setInspectorOpen(false);
+  }
+
+  function closeInspector() {
+    setInspectorOpen(false);
+    setMode("view");
   }
 
   const editing = mode === "create" || mode === "edit";
 
   return (
-    <section className="properties-canvas">
+    <section className={`properties-canvas ${inspectorOpen ? "has-property-inspector" : ""}`}>
       <div className="properties-header">
         <div>
-          <p className="eyebrow">Portfolio</p>
           <h1>Properties</h1>
-          <p className="subtle">Bank coverage, ledger source, close status.</p>
+          <p className="subtle">Addresses, associated banks, and prior-month reconciliation context.</p>
         </div>
         <div className="properties-actions">
           <button className="soft-button" type="button" onClick={() => onStartSession(selectedProperty)}>
@@ -2412,74 +2468,81 @@ function PropertiesScreen({
             <table className="property-table">
               <thead>
                 <tr>
-                  <th>Property</th>
-                  <th>Banks</th>
-                  <th>Ledger</th>
-                  <th>Close</th>
-                  <th>Open items</th>
-                  <th>Tie-out</th>
+                  <th>Property address</th>
+                  <th>Associated banks</th>
+                  <th>Last month</th>
                 </tr>
               </thead>
               <tbody>
-                {visibleProperties.map((property) => (
-                  <tr
-                    key={property.id}
-                    className={property.id === selectedProperty.id ? "selected" : ""}
-                    onClick={() => selectProperty(property)}
-                  >
-                    <td>
-                      <div className="property-name-cell">
-                        <strong>{property.name}</strong>
-                        <span>{property.code} · {property.address}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="bank-chip-row">
-                        {property.banks.slice(0, 2).map((bank) => (
-                          <span key={bank.id}>{bank.type}</span>
-                        ))}
-                        {property.banks.length > 2 && <span>+{property.banks.length - 2}</span>}
-                      </div>
-                    </td>
-                    <td>{property.ledgerSource}</td>
-                    <td>
-                      <span className="close-status">{property.closeStatus}</span>
-                      <small>{property.period}</small>
-                    </td>
-                    <td>
-                      <span className={property.openItems > 5 ? "risk-text" : ""}>
-                        {property.openItems} open · {property.exceptions} exceptions
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`tieout-state ${property.tieOut.toLowerCase().replaceAll(" ", "-")}`}>
-                        {shortTieOutLabel(property.tieOut)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {visibleProperties.map((property) => {
+                  const associatedBanks = getAssociatedBankSummaries(property);
+                  return (
+                    <tr
+                      key={property.id}
+                      className={property.id === selectedProperty.id ? "selected" : ""}
+                      onClick={() => selectProperty(property)}
+                    >
+                      <td>
+                        <div className="property-name-cell">
+                          <strong>{property.address}</strong>
+                          <span>{property.code} · {property.market}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="bank-logo-cluster" aria-label={formatAssociatedBanks(property)}>
+                          {associatedBanks.slice(0, 3).map((bank) => (
+                            <span
+                              className={`bank-logo-mini ${bank.brandClass}`}
+                              key={bank.name}
+                              title={`${bank.name} · ${bank.accounts} ${
+                                bank.accounts === 1 ? "account" : "accounts"
+                              }`}
+                            >
+                              {bank.logo ? <img src={bank.logo} alt="" /> : bank.name.slice(0, 2)}
+                            </span>
+                          ))}
+                          {associatedBanks.length > 3 && (
+                            <span className="bank-logo-overflow">+{associatedBanks.length - 3}</span>
+                          )}
+                        </div>
+                        <small>{formatBankCoverageSummary(property)}</small>
+                      </td>
+                      <td>
+                        <span>{property.lastReconciled}</span>
+                        <small className={property.openItems > 5 ? "risk-text" : ""}>
+                          {property.openItems} open · {property.exceptions} exceptions
+                        </small>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </section>
 
-        <aside className="property-inspector" aria-label="Selected property">
-          {editing ? (
+        <AnimatePresence>
+          {inspectorOpen && (
+            <motion.aside
+              className="property-inspector"
+              aria-label="Selected property"
+              initial={{ x: 24, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 24, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {editing ? (
             <form className="property-form" onSubmit={saveProperty}>
               <div className="property-inspector-header">
                 <div>
                   <p className="eyebrow">{mode === "create" ? "Create" : "Edit"}</p>
-                  <h2>{mode === "create" ? "New property" : selectedProperty.name}</h2>
+                  <h2>{mode === "create" ? "New property" : selectedProperty.address}</h2>
                 </div>
-                <button className="icon-button ghost" type="button" onClick={() => setMode("view")} aria-label="Cancel">
+                <button className="icon-button ghost" type="button" onClick={closeInspector} aria-label="Close property panel">
                   <X size={16} />
                 </button>
               </div>
               <div className="property-form-grid">
-                <label>
-                  <span>Name</span>
-                  <input value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} required />
-                </label>
                 <label>
                   <span>Code</span>
                   <input value={draft.code} onChange={(event) => updateDraft("code", event.target.value)} required />
@@ -2563,9 +2626,9 @@ function PropertiesScreen({
             <>
               <div className="property-inspector-header">
                 <div>
-                  <p className="eyebrow">Selected</p>
-                  <h2>{selectedProperty.name}</h2>
-                  <span>{selectedProperty.address}</span>
+                  <p className="eyebrow">Selected address</p>
+                  <h2>{selectedProperty.address}</h2>
+                  <span>{selectedProperty.code} · {selectedProperty.market}</span>
                 </div>
                 <div className="property-icon-actions">
                   <button className="icon-button" type="button" onClick={startEdit} aria-label="Edit property">
@@ -2580,6 +2643,9 @@ function PropertiesScreen({
                   >
                     <Trash2 size={16} />
                   </button>
+                  <button className="icon-button ghost" type="button" onClick={closeInspector} aria-label="Close property panel">
+                    <X size={16} />
+                  </button>
                 </div>
               </div>
 
@@ -2589,11 +2655,11 @@ function PropertiesScreen({
                   <dd>{selectedProperty.units}</dd>
                 </div>
                 <div>
-                  <dt>Ledger</dt>
-                  <dd>{selectedProperty.ledgerSource}</dd>
+                  <dt>Last month</dt>
+                  <dd>{selectedProperty.lastReconciled}</dd>
                 </div>
                 <div>
-                  <dt>Open items</dt>
+                  <dt>Prior open</dt>
                   <dd>{selectedProperty.openItems}</dd>
                 </div>
                 <div>
@@ -2623,8 +2689,10 @@ function PropertiesScreen({
                 Start session
               </button>
             </>
+              )}
+            </motion.aside>
           )}
-        </aside>
+        </AnimatePresence>
       </div>
     </section>
   );
@@ -2637,13 +2705,11 @@ function BankBoard({
   runState,
   recordsByBank,
   comparisonProgress,
-  rowExpanded,
   canStart,
   onUpload,
   onRemove,
   onStartRun,
   onManualLedgerRun,
-  onToggleRow,
   onOpenReview
 }) {
   const comparisonMode = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
@@ -2652,69 +2718,65 @@ function BankBoard({
 
   return (
     <section className="bank-board" aria-label="Associated property banks">
-      <div className="board-heading">
-        <div className="board-title-line">
-          <FileText size={16} />
-          <h2>Bank statements</h2>
+      <section className="workspace-section associated-banks-section" aria-labelledby="associated-banks-heading">
+        <WorkspaceSectionHeading icon={FileText} title="Associated Banks" id="associated-banks-heading" />
+        <p className="workspace-section-subtext">At least one statement is required to start reconciliation.</p>
+        <div className="bank-grid statement-list">
+          {banks.map((bank) => (
+            <BankTile
+              key={bank.id}
+              bank={bank}
+              uploaded={uploaded[bank.id]}
+              stage={bankStage[bank.id]}
+              active={activeStep?.bankId === bank.id || bankStage[bank.id] === "uploading" || statementScanStages.has(bankStage[bank.id])}
+              runState={runState}
+              onUpload={() => onUpload(bank.id)}
+              onRemove={() => onRemove(bank.id)}
+            />
+          ))}
         </div>
-      </div>
-      <div className="bank-grid statement-list">
-        {banks.map((bank) => (
-          <BankTile
-            key={bank.id}
-            bank={bank}
-            uploaded={uploaded[bank.id]}
-            stage={bankStage[bank.id]}
-            active={activeStep?.bankId === bank.id || bankStage[bank.id] === "scanning"}
-            runState={runState}
-            onUpload={() => onUpload(bank.id)}
-            onRemove={() => onRemove(bank.id)}
-          />
-        ))}
-      </div>
 
-      {runState === "draft" && uploadedBanks.length > 0 && (
-        <motion.div
-          className="reconcile-start-panel"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <span className="reconcile-ready-count">{readyCopy}</span>
-          <div className="reconcile-actions">
-            <button
-              className="primary-button"
-              type="button"
-              disabled={!canStart}
-              onClick={onStartRun}
-              aria-label="Log into the ERD and extract the ledger"
-            >
-              <Sparkles size={16} />
-              Fetch ERD ledger
-            </button>
-            <button
-              className="soft-button ledger-upload-action"
-              type="button"
-              disabled={!canStart}
-              onClick={onManualLedgerRun}
-              aria-label="Upload ledger for manual reconciliation"
-            >
-              <Upload size={16} />
-              Upload ledger
-            </button>
-          </div>
-        </motion.div>
-      )}
+        {runState === "draft" && uploadedBanks.length > 0 && (
+          <motion.div
+            className="reconcile-start-panel"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <span className="reconcile-ready-count">{readyCopy}</span>
+            <div className="reconcile-actions">
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!canStart}
+                onClick={onStartRun}
+                aria-label="Log into Yardi and extract the ledger"
+              >
+                <Sparkles size={16} />
+                Fetch Yardi ledger
+              </button>
+              <button
+                className="soft-button ledger-upload-action"
+                type="button"
+                disabled={!canStart}
+                onClick={onManualLedgerRun}
+                aria-label="Upload ledger for manual reconciliation"
+              >
+                <Upload size={16} />
+                Upload ledger
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </section>
 
       {comparisonMode && uploadedBanks.length > 0 && (
-        <section className="reconciliation-thread" aria-label="Reconciliation results">
-          <div className="board-heading compact">
-            <div>
-              <p className="eyebrow">Agent output</p>
-              <h2>Reconciliation workspace</h2>
-            </div>
-            <span>Statement and ERD ledger stay paired through review</span>
-          </div>
+        <section className="workspace-section reconciliation-thread" aria-labelledby="reconciliation-workspaces-heading">
+          <WorkspaceSectionHeading
+            icon={ArrowRightLeft}
+            title="Reconciliation workspaces"
+            id="reconciliation-workspaces-heading"
+          />
           <div className="bank-grid comparison-list">
             {uploadedBanks.map((bank) => (
               <ComparisonBankRow
@@ -2722,10 +2784,7 @@ function BankBoard({
                 bank={bank}
                 records={recordsByBank[bank.id]}
                 progress={comparisonProgress[bank.id] || 0}
-                stage={bankStage[bank.id]}
                 runState={runState}
-                expanded={rowExpanded[bank.id]}
-                onToggle={() => onToggleRow(bank.id)}
                 onOpenReview={() => onOpenReview(bank.id)}
               />
             ))}
@@ -2733,6 +2792,17 @@ function BankBoard({
         </section>
       )}
     </section>
+  );
+}
+
+function WorkspaceSectionHeading({ icon: Icon, title, id }) {
+  return (
+    <div className="workspace-section-heading">
+      <span className="workspace-section-icon" aria-hidden="true">
+        <Icon size={15} />
+      </span>
+      <h2 id={id}>{title}</h2>
+    </div>
   );
 }
 
@@ -2747,20 +2817,24 @@ function BankTile({
 }) {
   const locked = runState !== "draft";
   const hasFile = Boolean(uploaded);
-  const isScanning = stage === "scanning";
-  const uploadActionLabel = isScanning
-    ? `Scanning ${bank.shortName} statement`
-    : hasFile
-      ? locked
-        ? `${bank.shortName} statement uploaded`
-        : `Replace ${bank.shortName} statement`
-      : `Upload ${bank.shortName} statement`;
+  const isUploading = stage === "uploading";
+  const isScanning = statementScanStages.has(stage);
+  const isBusy = isUploading || isScanning;
+  const fileAgent = stage === "comparing" ? "reconciliation" : "intake";
+  const uploadActionLabel = isUploading
+    ? `Uploading ${bank.shortName} statement`
+    : isScanning
+      ? `Scanning ${bank.shortName} statement`
+      : hasFile
+        ? locked
+          ? `${bank.shortName} statement uploaded`
+          : `Replace ${bank.shortName} statement`
+        : `Upload ${bank.shortName} statement`;
 
   return (
     <motion.article
       layout
-      className={`bank-tile ${active ? "active" : ""} ${stage === "scanning" ? "scanning" : ""} ${hasFile ? "uploaded" : ""} ${!hasFile && locked ? "not-included" : ""}`}
-      whileHover={{ y: -1 }}
+      className={`bank-tile ${active ? "active" : ""} ${isUploading ? "uploading" : ""} ${isScanning ? "scanning" : ""} ${hasFile ? "uploaded" : ""} ${!hasFile && locked ? "not-included" : ""}`}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
     >
       <div className="bank-main-line">
@@ -2771,23 +2845,34 @@ function BankTile({
           <strong>{bank.shortName}</strong>
         </div>
         <button
-          className={`statement-file-action ${hasFile ? "has-file" : "empty"} ${isScanning ? "is-scanning" : ""}`}
+          className={`statement-file-action ${hasFile ? "has-file" : "empty"} ${isUploading ? "is-uploading" : ""} ${isScanning ? "is-scanning" : ""}`}
           type="button"
-          disabled={locked}
+          disabled={locked || isBusy}
           onClick={onUpload}
           aria-label={uploadActionLabel}
-          aria-disabled={isScanning ? "true" : undefined}
-          aria-busy={isScanning ? "true" : undefined}
+          aria-busy={isBusy ? "true" : undefined}
           title={isScanning ? uploadActionLabel : hasFile ? bank.statement : uploadActionLabel}
         >
           <span className="statement-file-object">
-            <img className="statement-file-art" src={statementFileIcon} alt="" />
-            <span className={`statement-file-state ${isScanning ? "scanning" : hasFile ? "uploaded" : "empty"}`} aria-hidden="true">
-              <img src={hasFile && !isScanning ? statementUploadedIcon : statementUploadIcon} alt="" />
+            <span className="statement-file-clip">
+              <img className="statement-file-art" src={statementFileIcon} alt="" />
             </span>
+            {isScanning ? (
+              <AgentOrb agent={fileAgent} status="active" className="statement-agent-orb" size={14} />
+            ) : (
+              <span className={`statement-file-state ${isUploading ? "uploading" : hasFile ? "uploaded" : "empty"}`} aria-hidden="true">
+                {isUploading ? (
+                  <Loader2 size={13} className="spin" />
+                ) : hasFile ? (
+                  <Check size={15} />
+                ) : (
+                  <Upload size={13} />
+                )}
+              </span>
+            )}
           </span>
         </button>
-        {hasFile && !locked && (
+        {hasFile && !locked && !isBusy && (
           <button
             className="icon-button ghost statement-remove-button"
             type="button"
@@ -2798,138 +2883,153 @@ function BankTile({
             <X size={14} />
           </button>
         )}
+        {!hasFile && !locked && !isBusy && (
+          <span className="bank-upload-tooltip" aria-hidden="true">
+            Upload bank statement
+          </span>
+        )}
       </div>
     </motion.article>
   );
 }
 
-function ComparisonBankRow({ bank, records, progress, stage, runState, expanded, onToggle, onOpenReview }) {
+function AgentOrb({ agent, status = "idle", className = "", size = 16, variant = "plain" }) {
+  const normalizedAgent = agent === "posting" ? "summary" : agent;
+  const StatusIcon = agentIconMap[normalizedAgent] || Activity;
+
+  return (
+    <span
+      className={`agent-state-mark ${variant === "trace" ? "trace-blob" : ""} ${normalizedAgent} ${status} ${className}`.trim()}
+      aria-hidden="true"
+    >
+      <StatusIcon size={size} />
+    </span>
+  );
+}
+
+function ComparisonBankRow({ bank, records, progress, runState, onOpenReview }) {
   const isReviewReady = ["review", "updating-yardi", "complete"].includes(runState);
   const isFinalizing = runState === "updating-yardi";
-  const isComplete = runState === "complete";
-  const approvedCount = records.approved.length;
+  const isReview = runState === "review";
+  const isPosted = runState === "complete";
   const exceptionCount = records.exceptions.length;
-  const liveCopy = getComparisonCopy(bank, runState, progress, records);
-  const headerTitle = isReviewReady ? `${bank.shortName} review packet` : `${bank.shortName} reconciliation`;
-  const headerCopy = isReviewReady
-    ? "Statement and ledger are paired. Exceptions are ready for review."
-    : liveCopy;
+  const statusValue = isReviewReady ? null : `${progress}%`;
+  const statusLabel = isPosted
+    ? "Posted"
+    : isReview
+      ? "Ready for review"
+    : isFinalizing
+      ? "Updating Yardi"
+      : "Reconciling";
+  const statusAgent = isFinalizing ? "summary" : "reconciliation";
+  const statusAgentState = isReview || isPosted ? "complete" : "active";
 
   return (
     <motion.article
       layout
-      className={`comparison-row ${isReviewReady ? "review-ready" : ""}`}
+      className="comparison-workspace"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
     >
-      <div className="comparison-line">
-        <span className={`latest-glyph ${isFinalizing ? "system" : "agent"}`}>
-          {isComplete ? <CheckCircle2 size={14} /> : isFinalizing ? <Workflow size={14} /> : <Sparkles size={14} />}
-        </span>
-        <div className="comparison-line-copy">
-          <strong>{headerTitle}</strong>
-          <span>{headerCopy}</span>
-        </div>
+      <div className="comparison-workspace-heading">
+        <h2>{bank.shortName}</h2>
         {isReviewReady && (
-          <div className="comparison-outcomes" aria-label={`${approvedCount} approved records and ${exceptionCount} exceptions`}>
-            <span className="comparison-outcome approved">
-              <BadgeCheck size={13} />
-              <strong>{approvedCount}</strong>
-              approved
+          <button
+            className="bank-review-trigger bank-review-action"
+            type="button"
+            onClick={onOpenReview}
+            disabled={isFinalizing}
+            aria-label={`Open ${bank.shortName} review`}
+          >
+            <ClipboardCheck size={14} />
+            <span>
+              <strong>Review bank</strong>
+              <small>
+                {records.matchRate} match · {exceptionCount} {exceptionCount === 1 ? "exception" : "exceptions"}
+              </small>
             </span>
-            <span className="comparison-outcome exception">
-              <AlertTriangle size={13} />
-              <strong>{exceptionCount}</strong>
-              exceptions
-            </span>
-          </div>
+            <ChevronRight size={15} />
+          </button>
         )}
       </div>
+      <div className={`comparison-row ${isReviewReady ? "review-ready" : ""}`}>
+        <div className="reconciliation-flow">
+          <div className={`reconciliation-flow-status agent-backed ${isPosted || isReview ? "complete" : isFinalizing ? "finalizing" : "running"}`}>
+            <AgentOrb agent={statusAgent} status={statusAgentState} className="agent-status-orb" size={14} />
+            {statusValue && <strong>{statusValue}</strong>}
+            <span>{statusLabel}</span>
+          </div>
 
-      <div className="comparison-pair">
-        <ComparisonCard
-          side="statement"
-          logo={bank.logo}
-          brandClass={bank.brandClass}
-          title={bank.shortName}
-          kicker="Bank statement"
-          meta={bank.statement}
-          count={`${bank.transactions} lines`}
-          total={records.statementTotal}
-        />
-        <ComparisonBridge progress={progress} runState={runState} matchRate={records.matchRate} />
-        <ComparisonCard
-          side="ledger"
-          title={`${bank.type} ledger`}
-          kicker="Yardi ledger"
-          meta={bank.ledger}
-          count={`${approvedCount + exceptionCount} records`}
-          total={records.ledgerTotal}
-        />
-      </div>
-
-      {isReviewReady && (
-        <div className="row-review-shell">
-          <button className="row-expand-button" type="button" onClick={onToggle}>
-            <span>{expanded ? "Hide summary" : "Show summary"}</span>
-            <ChevronRight size={15} className={expanded ? "rotated" : ""} />
-          </button>
-          <AnimatePresence initial={false}>
-            {expanded && (
-              <motion.div
-                className="bank-review-summary"
-                initial={{ opacity: 0, gridTemplateRows: "0fr" }}
-                animate={{ opacity: 1, gridTemplateRows: "1fr" }}
-                exit={{ opacity: 0, gridTemplateRows: "0fr" }}
-                transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <div className="summary-inner">
-                  <div className="summary-stat approved">
-                    <BadgeCheck size={16} />
-                    <div>
-                      <strong>{approvedCount}</strong>
-                      <span>Approved records</span>
-                    </div>
-                  </div>
-                  <div className="summary-stat exception">
-                    <AlertTriangle size={16} />
-                    <div>
-                      <strong>{exceptionCount}</strong>
-                      <span>Exceptions</span>
-                    </div>
-                  </div>
-                  <div className="summary-stat">
-                    <ArrowRightLeft size={16} />
-                    <div>
-                      <strong>{records.netDifference}</strong>
-                      <span>Net difference</span>
-                    </div>
-                  </div>
-                  <div className="summary-stat">
-                    <ShieldCheck size={16} />
-                    <div>
-                      <strong>{records.matchRate}</strong>
-                      <span>Match confidence</span>
-                    </div>
-                  </div>
-                  <button className="soft-button open-review" type="button" onClick={onOpenReview} disabled={runState === "updating-yardi"}>
-                    <FileText size={15} />
-                    Open review
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="reconciliation-flow-body">
+            <FlowPath kind="split" idSeed={bank.id} />
+            <div className="comparison-pair">
+              <ComparisonCard
+                side="statement"
+                logo={bank.logo}
+                brandClass={bank.brandClass}
+                title={bank.shortName}
+                kicker="Bank statement"
+                total={records.statementTotal}
+              />
+              <ComparisonCard
+                side="ledger"
+                title={`${bank.type} ledger`}
+                kicker="Yardi ledger"
+                total={records.ledgerTotal}
+              />
+            </div>
+          </div>
         </div>
-      )}
+      </div>
     </motion.article>
   );
 }
 
-function ComparisonCard({ side, logo, brandClass, title, kicker, meta, count, total }) {
-  const totalLabel = side === "statement" ? "Statement total" : "Ledger total";
+function FlowPath({ kind, idSeed }) {
+  const gradientId = `flow-gradient-${kind}-${idSeed}`;
+  const activeColor = "rgba(73, 79, 223, 0.58)";
+  const segments =
+    kind === "merge"
+      ? [
+          { path: "M2 0 V12 H50", type: "branch" },
+          { path: "M98 0 V12 H50", type: "branch" },
+          { path: "M50 12 V40", type: "stem" }
+        ]
+      : [
+          { path: "M50 0 V20", type: "stem" },
+          { path: "M50 20 H2 V40", type: "branch" },
+          { path: "M50 20 H98 V40", type: "branch" }
+        ];
 
+  return (
+    <svg className={`flow-path ${kind}`} viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,255,255,0)" stopOpacity="0" />
+          <stop offset="42%" stopColor={activeColor} stopOpacity="0.05" />
+          <stop offset="52%" stopColor={activeColor} stopOpacity="0.78" />
+          <stop offset="65%" stopColor={activeColor} stopOpacity="0.08" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {segments.map(({ path, type }) => (
+        <path className={`flow-path-rail ${type}`} d={path} key={`rail-${path}`} pathLength="1" />
+      ))}
+      {segments.map(({ path, type }, index) => (
+        <path
+          className={`flow-path-motion ${kind}-${type} ${index === 2 ? "delay" : ""}`}
+          d={path}
+          key={`motion-${path}`}
+          pathLength="1"
+          stroke={`url(#${gradientId})`}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function ComparisonCard({ side, logo, brandClass, title, kicker, total }) {
   return (
     <div className={`comparison-card ${side}`}>
       <div className="comparison-card-head">
@@ -2943,37 +3043,14 @@ function ComparisonCard({ side, logo, brandClass, title, kicker, meta, count, to
           </span>
         )}
         <div>
-          <strong>{title}</strong>
           <span>{kicker}</span>
+          <strong>{title}</strong>
         </div>
       </div>
       <div className="comparison-card-total">
-        <span>{totalLabel}</span>
         <strong>{total}</strong>
+        <span>{side === "statement" ? "Statement total" : "Ledger total"}</span>
       </div>
-      <div className="comparison-card-meta">
-        <span className="comparison-card-file">
-          <FileText size={12} />
-          {meta}
-        </span>
-        <span>{count}</span>
-      </div>
-    </div>
-  );
-}
-
-function ComparisonBridge({ progress, runState, matchRate }) {
-  const complete = ["review", "updating-yardi", "complete"].includes(runState);
-  const bridgeValue = complete ? matchRate : `${progress}%`;
-  return (
-    <div
-      className={`comparison-bridge ${complete ? "complete" : "running"}`}
-      style={{ "--bridge-progress": `${complete ? 100 : progress}%` }}
-    >
-      <div className="bridge-track" aria-hidden="true" />
-      <span className="bridge-percent" aria-label={complete ? `${bridgeValue} match confidence` : `${bridgeValue} reconciled`}>
-        {bridgeValue}
-      </span>
     </div>
   );
 }
@@ -2982,6 +3059,7 @@ function StageBadge({ stage }) {
   const label =
     {
       waiting: "Missing",
+      uploading: "Uploading",
       "statement-ready": "Uploaded",
       "not-included": "Not included",
       "ledger-importing": "Importing",
@@ -2997,13 +3075,13 @@ function StageBadge({ stage }) {
 
   return (
     <span className={`stage-badge ${stage}`}>
-      {["ledger-importing", "parsing", "normalizing", "scanning", "comparing"].includes(stage) && <Loader2 size={12} className="spin" />}
+      {["uploading", "ledger-importing", "parsing", "normalizing", "scanning", "comparing"].includes(stage) && <Loader2 size={12} className="spin" />}
       {label}
     </span>
   );
 }
 
-function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepIndex }) {
+function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepIndex, onSubmit }) {
   if (!["reconciling", "review", "updating-yardi", "complete"].includes(runState)) return null;
 
   if (runState === "complete") {
@@ -3014,10 +3092,13 @@ function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepInd
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="final-summary-copy">
-          <p className="eyebrow">Summary and Reports Agent</p>
-          <h2>{cycle} reconciliation is ready for controller review</h2>
-          <p>Approved records were posted to Yardi and remaining exceptions were flagged for review.</p>
+        <div className="final-summary-copy process-agent-copy">
+          <AgentOrb agent="summary" status="complete" className="process-agent-orb" />
+          <div>
+            <p className="eyebrow">Summary and Reports Agent</p>
+            <h2>{cycle} reconciliation is ready for controller review</h2>
+            <p>Approved records were posted to Yardi and remaining exceptions were flagged for review.</p>
+          </div>
         </div>
         <div className="final-metrics">
           <MetricChip label="Banks reconciled" value={runTotals.banks} />
@@ -3042,10 +3123,13 @@ function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepInd
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div>
-          <p className="eyebrow">Final stage</p>
-          <h2>Updating Yardi and preparing reports</h2>
-          <span>{yardiUpdateSteps[yardiStepIndex]}</span>
+        <div className="process-agent-copy">
+          <AgentOrb agent="summary" status="active" className="process-agent-orb" />
+          <div>
+            <p className="eyebrow">Final stage</p>
+            <h2>Updating Yardi and preparing reports</h2>
+            <span>{yardiUpdateSteps[yardiStepIndex]}</span>
+          </div>
         </div>
         <div className="progress-orbit" aria-label={`${yardiProgress}% complete`}>
           <svg viewBox="0 0 44 44" role="img" aria-hidden="true">
@@ -3058,26 +3142,7 @@ function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepInd
     );
   }
 
-  if (runState === "review") {
-    return (
-      <motion.section
-        className="process-band review"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <div>
-          <p className="eyebrow">Exception Agent</p>
-          <h2>Review summaries are ready</h2>
-          <span>Open a bank row to inspect approved records, exceptions, and agent reasoning.</span>
-        </div>
-        <div className="mini-outcomes">
-          <MetricChip label="Approved" value={runTotals.approved} />
-          <MetricChip label="Exceptions" value={runTotals.exceptions} />
-        </div>
-      </motion.section>
-    );
-  }
+  if (runState === "review") return null;
 
   return (
     <motion.section
@@ -3086,15 +3151,13 @@ function ProcessStatus({ runState, cycle, runTotals, yardiProgress, yardiStepInd
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
     >
-      <div>
-        <p className="eyebrow">Reconciliation Agent</p>
-        <h2>Comparing statements with Yardi ledgers</h2>
-        <span>Rows are running in parallel. Details appear when exceptions are ready for review.</span>
-      </div>
-      <div className="agent-motion-chip">
-        <span />
-        <span />
-        <span />
+      <div className="process-agent-copy">
+        <AgentOrb agent="reconciliation" status="active" className="process-agent-orb" />
+        <div>
+          <p className="eyebrow">Reconciliation Agent</p>
+          <h2>Comparing statements with Yardi ledgers</h2>
+          <span>Rows are running in parallel. Details appear when exceptions are ready for review.</span>
+        </div>
       </div>
     </motion.section>
   );
@@ -3121,29 +3184,10 @@ function ArtifactCard({ title, meta }) {
   );
 }
 
-function ReviewSubmitBar({ runTotals, onSubmit }) {
-  return (
-    <motion.section
-      className="review-submit-bar"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-    >
-      <div>
-        <strong>Ready to update Yardi</strong>
-        <span>
-          {runTotals.approved} approved records will be posted, {runTotals.exceptions} exceptions will be flagged.
-        </span>
-      </div>
-      <button className="primary-button" onClick={onSubmit}>
-        <Send size={15} />
-        Send approved to Yardi and flag exceptions
-      </button>
-    </motion.section>
-  );
-}
-
 function ReviewModal({ bank, records, open, onClose, onMove, onMoveSelected, onComment }) {
+  const approvedCount = records?.approved.length || 0;
+  const exceptionCount = records?.exceptions.length || 0;
+
   return (
     <AnimatePresence>
       {open && bank && records && (
@@ -3166,12 +3210,35 @@ function ReviewModal({ bank, records, open, onClose, onMove, onMoveSelected, onC
             aria-label={`${bank.name} reconciliation review`}
           >
             <div className="review-modal-header">
-              <div>
-                <p className="eyebrow">Exception Agent review</p>
+              <div className="review-modal-title">
+                <p className="eyebrow">Bank review</p>
                 <h2>{bank.name}</h2>
-                <span>Feedback updates agent memory silently and remains attached to each record.</span>
+                <span>Review approved matches and exceptions before posting to Yardi.</span>
               </div>
-              <button className="icon-button" onClick={onClose} aria-label="Close review">
+              <div className="review-modal-stats" aria-label="Review summary">
+                <span className="review-stat approved" aria-label={`${approvedCount} approved`}>
+                  <BadgeCheck size={14} />
+                  <span>
+                    <strong>{approvedCount}</strong>
+                    <small>approved</small>
+                  </span>
+                </span>
+                <span className="review-stat exceptions" aria-label={`${exceptionCount} exceptions`}>
+                  <AlertTriangle size={14} />
+                  <span>
+                    <strong>{exceptionCount}</strong>
+                    <small>exceptions</small>
+                  </span>
+                </span>
+                <span className="review-stat" aria-label={`${records.matchRate} match`}>
+                  <ShieldCheck size={14} />
+                  <span>
+                    <strong>{records.matchRate}</strong>
+                    <small>match</small>
+                  </span>
+                </span>
+              </div>
+              <button className="icon-button ghost review-close-button" type="button" onClick={onClose} aria-label="Close review">
                 <X size={17} />
               </button>
             </div>
@@ -3208,6 +3275,11 @@ function RecordColumn({ bankId, listKey, title, records, onMove, onMoveSelected,
   const [openRecord, setOpenRecord] = useState(null);
   const selectedCount = selectedIds.length;
   const targetLabel = listKey === "approved" ? "exceptions" : "approved";
+  const isApproved = listKey === "approved";
+  const ColumnIcon = isApproved ? BadgeCheck : AlertTriangle;
+  const columnTitle = isApproved ? "Approved ledger" : "Exception ledger";
+  const columnDescription = isApproved ? "Ready to post" : "Requires decision";
+  const columnTitleId = `${bankId}-${listKey}-ledger-title`;
 
   useEffect(() => {
     setSelectionMode(false);
@@ -3229,56 +3301,90 @@ function RecordColumn({ bankId, listKey, title, records, onMove, onMoveSelected,
     setSelectionMode(false);
   }
 
+  function toggleAllSelected() {
+    setSelectedIds((current) =>
+      current.length === records.length ? [] : records.map((record) => record.id)
+    );
+  }
+
   return (
-    <section className={`record-column ${listKey}`}>
+    <section className={`record-column ${listKey}`} aria-labelledby={columnTitleId}>
       <div className="record-column-header">
-        <div>
-          <strong>{title}</strong>
-          <span>{records.length} records</span>
+        <span className="record-column-icon" aria-hidden="true">
+          <ColumnIcon size={16} />
+        </span>
+        <div className="record-column-copy">
+          <strong id={columnTitleId}>{columnTitle}</strong>
+          <span>{columnDescription}</span>
         </div>
-        <button
-          className="micro-button ghost"
-          onClick={() => {
-            setSelectionMode((current) => !current);
-            setSelectedIds([]);
-          }}
-        >
-          {selectionMode ? "Done" : "Select"}
-        </button>
+        <div className="record-column-tools">
+          <span className="record-count" aria-label={`${records.length} ${records.length === 1 ? "record" : "records"}`}>
+            <strong>{records.length}</strong>
+            <small>{records.length === 1 ? "record" : "records"}</small>
+          </span>
+          <button
+            className={`select-toggle ${selectionMode ? "active" : ""}`}
+            type="button"
+            aria-pressed={selectionMode}
+            onClick={() => {
+              setSelectionMode((current) => !current);
+              setSelectedIds([]);
+            }}
+          >
+            {selectionMode ? <X size={13} /> : <CheckCircle2 size={13} />}
+            <span>{selectionMode ? "Cancel" : "Select records"}</span>
+          </button>
+        </div>
       </div>
       <AnimatePresence initial={false}>
-        {selectionMode && selectedCount > 0 && (
+        {selectionMode && (
           <motion.div
-            className="selection-bar"
+            className={`selection-bar ${selectedCount > 0 ? "has-selection" : ""}`}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.16 }}
           >
-            <span>{selectedCount} selected</span>
-            <button className="micro-button" onClick={moveSelected}>
-              Move selected
-            </button>
+            <span>
+              {selectedCount > 0
+                ? `${selectedCount} selected for ${targetLabel}`
+                : `Select rows to move to ${targetLabel}`}
+            </span>
+            <div>
+              <button className="micro-button ghost" type="button" onClick={toggleAllSelected} disabled={records.length === 0}>
+                {selectedCount === records.length && records.length > 0 ? "Clear" : "Select all"}
+              </button>
+              <button className="micro-button" type="button" onClick={moveSelected} disabled={selectedCount === 0}>
+                Move to {targetLabel}
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
       <div className="record-list">
-        {records.map((record) => (
-          <RecordItem
-            key={record.id}
-            bankId={bankId}
-            listKey={listKey}
-            record={record}
-            targetLabel={targetLabel}
-            selectionMode={selectionMode}
-            selected={selectedIds.includes(record.id)}
-            open={openRecord === record.id}
-            onToggleSelected={() => toggleSelected(record.id)}
-            onToggleOpen={() => setOpenRecord((current) => (current === record.id ? null : record.id))}
-            onMove={() => onMove(bankId, listKey, record.id)}
-            onComment={onComment}
-          />
-        ))}
+        {records.length > 0 ? (
+          records.map((record) => (
+            <RecordItem
+              key={record.id}
+              bankId={bankId}
+              listKey={listKey}
+              record={record}
+              targetLabel={targetLabel}
+              selectionMode={selectionMode}
+              selected={selectedIds.includes(record.id)}
+              open={openRecord === record.id}
+              onToggleSelected={() => toggleSelected(record.id)}
+              onToggleOpen={() => setOpenRecord((current) => (current === record.id ? null : record.id))}
+              onMove={() => onMove(bankId, listKey, record.id)}
+              onComment={onComment}
+            />
+          ))
+        ) : (
+          <div className="record-empty">
+            <strong>No {title.toLowerCase()}</strong>
+            <span>{isApproved ? "Approved matches will appear here." : "New exceptions will appear here."}</span>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -3301,13 +3407,15 @@ function RecordItem({
 
   function submitComment(event) {
     event.preventDefault();
-    onComment(bankId, listKey, record.id, draft);
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    onComment(bankId, listKey, record.id, trimmed);
     setDraft("");
   }
 
   return (
-    <article className={`record-item ${open ? "open" : ""}`}>
-      <div className="record-row">
+    <article className={`record-item ${listKey} ${open ? "open" : ""}`}>
+      <div className={`record-row ${selectionMode ? "selecting" : ""}`}>
         {selectionMode && (
           <input
             type="checkbox"
@@ -3316,22 +3424,26 @@ function RecordItem({
             aria-label={`Select ${record.title}`}
           />
         )}
-        <button className="record-trigger" onClick={onToggleOpen}>
-          <div>
+        <button className={`record-trigger ${open ? "open" : ""}`} type="button" onClick={onToggleOpen} aria-expanded={open}>
+          <div className="record-copy">
             <strong>{record.title}</strong>
             <span>{record.meta}</span>
           </div>
-          <div className="record-amount">
-            <strong>{record.amount}</strong>
-            <span>{record.date}</span>
+          <div className="record-summary">
+            <span className={`confidence-chip ${record.confidence.toLowerCase()}`}>{record.confidence}</span>
+            <div className="record-amount">
+              <strong>{record.amount}</strong>
+              <span>{record.date}</span>
+            </div>
+            <ChevronRight size={15} className="record-disclosure" />
           </div>
         </button>
         {!selectionMode && (
           <div className="record-actions">
-            <button className="icon-button ghost" onClick={onToggleOpen} aria-label="Comment on record">
+            <button className="icon-button ghost" type="button" onClick={onToggleOpen} aria-label={`Review ${record.title}`}>
               <MessageCircle size={15} />
             </button>
-            <button className="icon-button ghost" onClick={onMove} aria-label={`Move to ${targetLabel}`}>
+            <button className="icon-button ghost" type="button" onClick={onMove} aria-label={`Move ${record.title} to ${targetLabel}`}>
               <ArrowRightLeft size={15} />
             </button>
           </div>
@@ -3347,6 +3459,16 @@ function RecordItem({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           >
             <div className="record-detail-inner">
+              <div className="record-detail-heading">
+                <div>
+                  <strong>Review context</strong>
+                  <span>Reasoning, evidence, and reviewer guidance.</span>
+                </div>
+                <button className="micro-button ghost detail-move-button" type="button" onClick={onMove}>
+                  <ArrowRightLeft size={13} />
+                  Move to {targetLabel}
+                </button>
+              </div>
               <div className="reason-block">
                 <span>Agent reason</span>
                 <p>{record.reason}</p>
@@ -3374,10 +3496,11 @@ function RecordItem({
                 <textarea
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
+                  aria-label={`Feedback for ${record.title}`}
                   placeholder="Correct the agent reasoning or add review context"
                   rows="2"
                 />
-                <button className="micro-button" type="submit">
+                <button className="micro-button" type="submit" disabled={!draft.trim()}>
                   Add feedback
                 </button>
               </form>
@@ -3396,7 +3519,8 @@ function ObservabilityRail({
   runTotals,
   activeStep,
   yardiProgress,
-  yardiStepIndex
+  yardiStepIndex,
+  onSubmit
 }) {
   const [railTab, setRailTab] = useState("agent-work");
   const agents = getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yardiStepIndex });
@@ -3475,6 +3599,12 @@ function ObservabilityRail({
                       />
                     ))}
                   </div>
+                  <RailHandoffPanel
+                    runState={runState}
+                    runTotals={runTotals}
+                    yardiProgress={yardiProgress}
+                    onSubmit={onSubmit}
+                  />
                 </section>
               </>
             ) : (
@@ -3487,21 +3617,69 @@ function ObservabilityRail({
   );
 }
 
-function AgentRailAccordion({ agent, expanded, dimmed, onToggle }) {
-  const StatusIcon =
-    agent.status === "complete" ? CheckCircle2 : agent.status === "active" ? Loader2 : CircleDot;
+function RailHandoffPanel({ runState, runTotals, yardiProgress, onSubmit }) {
+  if (!["review", "updating-yardi", "complete"].includes(runState)) return null;
+
+  const isReview = runState === "review";
+  const isUpdating = runState === "updating-yardi";
+  const title = isReview ? "Yardi handoff ready" : isUpdating ? "Sending to Yardi" : "Run complete";
+  const copy = isReview
+    ? "Review bank exceptions, then post approved records to Yardi."
+    : isUpdating
+      ? `${yardiProgress}% complete. Posting approved records and flagging exceptions.`
+      : "Posted records and exception flags are ready for audit.";
 
   return (
-    <section className={`agent-accordion ${agent.status} ${dimmed ? "dimmed" : ""}`}>
+    <section className={`rail-handoff-panel ${runState}`} aria-label="Yardi handoff">
+      <div className="rail-handoff-label">
+        <Send size={12} />
+        <span>Final handoff</span>
+      </div>
+      <div className="rail-handoff-heading">
+        <div>
+          <strong>{title}</strong>
+          <span>{copy}</span>
+        </div>
+      </div>
+      <div className="rail-handoff-stats" aria-label="Handoff totals">
+        <span aria-label={`${runTotals.approved} approved`}>
+          <strong>{runTotals.approved}</strong>
+          <small>Approved</small>
+        </span>
+        <span aria-label={`${runTotals.exceptions} exceptions`}>
+          <strong>{runTotals.exceptions}</strong>
+          <small>Exceptions</small>
+        </span>
+        <span aria-label={`${runTotals.banks} banks`}>
+          <strong>{runTotals.banks}</strong>
+          <small>Banks</small>
+        </span>
+      </div>
+      {isUpdating && (
+        <div className="rail-handoff-progress" aria-label={`${yardiProgress}% complete`}>
+          <span style={{ "--handoff-progress": `${yardiProgress}%` }} />
+        </div>
+      )}
+      {isReview && (
+        <button className="primary-button rail-handoff-action" type="button" onClick={onSubmit}>
+          <Send size={14} />
+          Post approved to Yardi
+        </button>
+      )}
+    </section>
+  );
+}
+
+function AgentRailAccordion({ agent, expanded, dimmed, onToggle }) {
+  return (
+    <section className={`agent-accordion ${agent.id} ${agent.status} ${dimmed ? "dimmed" : ""}`}>
       <button
         className="agent-accordion-button"
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
       >
-        <span className={`agent-state-mark ${agent.status}`}>
-          <StatusIcon size={14} className={agent.status === "active" ? "spin" : ""} />
-        </span>
+        <AgentOrb agent={agent.id} status={agent.status} variant="trace" size={15} />
         <span className="agent-heading">
           <strong>{agent.name}</strong>
         </span>
@@ -3556,16 +3734,6 @@ function AgentRailAccordion({ agent, expanded, dimmed, onToggle }) {
               </div>
             )}
 
-            {agent.status === "active" && (
-              <div className="agent-live-note">
-                <Activity size={13} />
-                <span>
-                  {agent.progress !== undefined
-                    ? `${agent.progress}% complete`
-                    : "Open span is still collecting signals"}
-                </span>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -3653,10 +3821,10 @@ function PropertyDrawer({ open, setOpen, properties, selectedProperty, setSelect
                   onClick={() => setSelectedProperty(property)}
                 >
                   <div>
-                    <strong>{property.name}</strong>
-                    <span>{property.address}</span>
+                    <strong>{property.address}</strong>
+                    <span>{property.code} · {property.market}</span>
                   </div>
-                  <small>{property.banks} banks</small>
+                  <small>{getPropertyBankCount(property)} banks</small>
                 </button>
               ))}
             </div>
@@ -3667,21 +3835,32 @@ function PropertyDrawer({ open, setOpen, properties, selectedProperty, setSelect
   );
 }
 
-function StatusPill({ status }) {
-  const label =
+function getSessionStatusMeta(status) {
+  return (
     {
-      Draft: "Not started",
-      "Needs input": "Needs input",
-      "Needs review": "Needs review",
-      "Ready for handoff": "Ready for handoff",
-      Reconciling: "Reconciling",
-      Importing: "Importing",
-      Parsing: "Parsing",
-      Updating: "Updating",
-      Complete: "Complete"
-    }[status] || status;
+      Draft: { label: "Not started", Icon: CircleDashed, tone: "draft" },
+      Importing: { label: "Importing", Icon: CircleDot, tone: "active" },
+      Parsing: { label: "Parsing", Icon: CircleDot, tone: "active" },
+      Reconciling: { label: "Reconciling", Icon: CircleDot, tone: "active" },
+      Updating: { label: "Updating", Icon: CircleDot, tone: "active" },
+      "Needs input": { label: "Needs input", Icon: CircleAlert, tone: "alert" },
+      "Needs review": { label: "Ready for review", Icon: CircleDotDashed, tone: "review" },
+      "Ready for handoff": { label: "Ready for handoff", Icon: CheckCircle2, tone: "ready" },
+      Complete: { label: "Complete", Icon: CheckCircle2, tone: "complete" },
+      Failed: { label: "Could not complete", Icon: CircleAlert, tone: "alert" },
+      Error: { label: "Could not complete", Icon: CircleAlert, tone: "alert" }
+    }[status] || { label: status, Icon: CircleDashed, tone: "draft" }
+  );
+}
 
-  return <span className={`status-pill ${status.toLowerCase().replaceAll(" ", "-")}`}>{label}</span>;
+function SessionStatusIcon({ status }) {
+  const { label, Icon, tone } = getSessionStatusMeta(status);
+
+  return (
+    <span className={`session-status-icon ${tone}`} title={label} aria-hidden="true">
+      <Icon />
+    </span>
+  );
 }
 
 function DashboardStatusPill({ status }) {
