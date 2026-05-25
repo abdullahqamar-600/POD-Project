@@ -1921,19 +1921,19 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
     { name: "Summary", latency: "0.8s", tokens: "0.9k", load: 18 }
   ];
   const sessionMetrics = [
-    { label: "Banks reconciled", value: `${banksDone}/${banksTotal}`, meta: "Resolved across sessions", spark: [42, 52, 48, 61, 55, 67, 72] },
-    { label: "Approved posted", value: String(approvedTotal), meta: "Sent to Yardi", tone: "good", spark: [30, 38, 44, 52, 62, 69, 78] },
-    { label: "Exceptions", value: String(exceptionTotal), meta: "Need controller attention", tone: "attention", spark: [70, 58, 64, 52, 49, 44, 38] },
-    { label: "Automation rate", value: `${automationRate}%`, meta: "Portfolio average", spark: [56, 60, 58, 63, 66, 69, 68] }
+    { label: "Banks reconciled", value: `${banksDone}/${banksTotal}`, meta: "Resolved across sessions" },
+    { label: "Approved posted", value: String(approvedTotal), meta: "Sent to Yardi", tone: "good" },
+    { label: "Exceptions", value: String(exceptionTotal), meta: "Need controller attention", tone: "attention" },
+    { label: "Automation rate", value: `${automationRate}%`, meta: "Portfolio average" }
   ];
 
   return (
     <section className={`dashboard-canvas ${selectedInsight ? "has-dashboard-insight" : ""}`} aria-label="Dashboard">
       <div className="dashboard-main-stack">
         <section className="dashboard-observability-strip" aria-label="AI observability">
-          <section className="dashboard-metric-panel" aria-label="Portfolio metrics">
-            <h2>Portfolio metrics</h2>
-            <div className="session-metric-strip" aria-label="Portfolio session metrics">
+          <section className="dashboard-metric-panel" aria-label="Close health">
+            <h2>Close health</h2>
+            <div className="session-metric-strip" aria-label="Close health metrics">
               {sessionMetrics.map((metric) => (
                 <DashboardMetricCell key={metric.label} metric={metric} />
               ))}
@@ -2049,17 +2049,6 @@ function DashboardMetricCell({ metric }) {
       <span>{metric.label}</span>
       <strong>{metric.value}</strong>
       <small>{metric.meta}</small>
-      <DashboardMetricSpark values={metric.spark} tone={metric.tone} />
-    </div>
-  );
-}
-
-function DashboardMetricSpark({ values, tone }) {
-  return (
-    <div className={`dashboard-metric-spark ${tone || ""}`} aria-hidden="true">
-      {values.map((value, index) => (
-        <i key={`${value}-${index}`} style={{ "--spark-height": `${value}%` }} />
-      ))}
     </div>
   );
 }
