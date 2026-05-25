@@ -425,14 +425,14 @@ const automationSteps = [
   {
     key: "yardi-queued",
     type: "system",
-    title: "Yardi import requested",
-    copy: "Browser automation queued",
+    title: "ERD ledger extraction requested",
+    copy: "Secure login automation queued",
     duration: 900
   },
   {
     key: "yardi-login",
     type: "system",
-    title: "Yardi session running",
+    title: "ERD session running",
     copy: "Opening property ledger search",
     duration: 1100
   },
@@ -580,7 +580,7 @@ function App() {
           setSessions((current) =>
             current.map((session) =>
               session.id === selectedSession
-                ? { ...session, status: "Importing", detail: "Yardi automation queued" }
+                ? { ...session, status: "Importing", detail: "ERD extraction queued" }
                 : session
             )
           );
@@ -646,7 +646,7 @@ function App() {
       key: "comparison",
       type: "agent",
       title: "Reconciliation Agent comparing ledgers",
-      copy: "Matching statements with Yardi records in parallel"
+      copy: "Matching statements with ERD ledger records in parallel"
     });
     setEvents((current) => [
       ...current,
@@ -835,8 +835,15 @@ function App() {
     if (runState !== "draft") return;
     const alreadyUploaded = Boolean(uploaded[bankId]);
     setUploaded((current) => ({ ...current, [bankId]: true }));
-    setBankStage((current) => ({ ...current, [bankId]: "statement-ready" }));
+    setBankStage((current) => ({ ...current, [bankId]: "scanning" }));
     const bank = banks.find((item) => item.id === bankId);
+    setActiveStep({
+      key: "statement-scan",
+      type: "agent",
+      bankId,
+      title: "Intake scanning statement",
+      copy: `Reading ${bank.shortName} statement and extracting fields`
+    });
     setEvents((current) => [
       ...current,
       {
@@ -847,6 +854,12 @@ function App() {
         at: "now"
       }
     ]);
+    window.setTimeout(() => {
+      setBankStage((current) => ({ ...current, [bankId]: "statement-ready" }));
+      setActiveStep((current) =>
+        current?.key === "statement-scan" && current.bankId === bankId ? null : current
+      );
+    }, 1500);
   }
 
   function removeStatement(bankId) {
@@ -857,6 +870,9 @@ function App() {
       return next;
     });
     setBankStage((current) => ({ ...current, [bankId]: "waiting" }));
+    setActiveStep((current) =>
+      current?.key === "statement-scan" && current.bankId === bankId ? null : current
+    );
     const bank = banks.find((item) => item.id === bankId);
     setEvents((current) => [
       ...current,
@@ -1358,19 +1374,22 @@ function getRunTotals(recordsByBank, sourceBanks = banks) {
 function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yardiStepIndex }) {
   const totalRecords = runTotals.approved + runTotals.exceptions;
   const matchRate = totalRecords ? Math.round((runTotals.approved / totalRecords) * 100) : 0;
+  const statementScanActive = activeStep?.key === "statement-scan";
   const intakeComplete = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
   const reconciliationComplete = ["review", "updating-yardi", "complete"].includes(runState);
   const exceptionComplete = ["updating-yardi", "complete"].includes(runState);
   const postingComplete = runState === "complete";
 
-  const intakeStatus = runState === "running" ? "active" : intakeComplete ? "complete" : "idle";
+  const intakeStatus =
+    runState === "running" || statementScanActive ? "active" : intakeComplete ? "complete" : "idle";
   const reconciliationStatus =
     runState === "reconciling" ? "active" : reconciliationComplete ? "complete" : "idle";
   const exceptionStatus = runState === "review" ? "active" : exceptionComplete ? "complete" : "idle";
   const postingStatus = runState === "updating-yardi" ? "active" : postingComplete ? "complete" : "idle";
 
   const intakeTimeline = [
-    { title: "Yardi ledgers found", copy: "Ledger files paired with uploaded statements" },
+    { title: "Statement scanned", copy: "File structure, totals, and fields detected" },
+    { title: "ERD ledger extracted", copy: "Ledger files paired with uploaded statements" },
     { title: "Statement fields normalized", copy: "Dates, deposits, withdrawals, and balances aligned" },
     { title: "Source artifacts saved", copy: "Clean inputs stored for review" },
     { title: "Handoff prepared", copy: "Normalized artifacts sent to reconciliation" }
@@ -1379,17 +1398,18 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     {
       "yardi-queued": 1,
       "yardi-login": 1,
-      "ledgers-found": 1,
-      "parsing-started": 2,
-      "normalizing-chase": 2,
-      "normalizing-wells": 2,
-      "normalizing-boa": 2,
-      "artifacts-saved": 3,
-      handoff: 4
+      "statement-scan": 1,
+      "ledgers-found": 2,
+      "parsing-started": 3,
+      "normalizing-chase": 3,
+      "normalizing-wells": 3,
+      "normalizing-boa": 3,
+      "artifacts-saved": 4,
+      handoff: 5
     }[activeStep?.key] || 1;
 
   const reconciliationTimeline = [
-    { title: "Comparison spans opened", copy: "Statement rows matched against Yardi ledger rows" },
+    { title: "Comparison spans opened", copy: "Statement rows matched against ERD ledger rows" },
     { title: "Variance checks completed", copy: "Amounts, dates, and references scored in parallel" },
     { title: "Buckets generated", copy: "Approved records and exceptions separated for review" }
   ];
@@ -1432,11 +1452,11 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
     {
       id: "reconciliation",
       name: "Reconciliation",
-      role: "Matches statement rows to Yardi records",
+      role: "Matches statement rows to ERD records",
       status: reconciliationStatus,
       latest:
         reconciliationStatus === "active"
-          ? activeStep?.copy || "Matching statements with Yardi records"
+          ? activeStep?.copy || "Matching statements with ERD records"
           : reconciliationStatus === "complete"
             ? "Match buckets passed to Exception."
             : "Waiting for normalized artifacts.",
@@ -1494,9 +1514,21 @@ function getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yar
 }
 
 function timelineForStatus(status, timeline, activeCount) {
-  if (status === "idle") return [];
-  if (status === "active") return timeline.slice(0, Math.max(1, activeCount));
-  return timeline;
+  const currentIndex =
+    status === "active" ? Math.min(timeline.length - 1, Math.max(0, activeCount - 1)) : -1;
+  return timeline.map((step, index) => ({
+    ...step,
+    state:
+      status === "complete"
+        ? "done"
+        : status === "active"
+          ? index < currentIndex
+            ? "done"
+            : index === currentIndex
+              ? "current"
+              : "upcoming"
+          : "upcoming"
+  }));
 }
 
 function getComparisonCopy(bank, runState, progress, records) {
@@ -2652,10 +2684,10 @@ function BankBoard({
               type="button"
               disabled={!canStart}
               onClick={onStartRun}
-              aria-label="Start reconciliation using Yardi import"
+              aria-label="Log into the ERD and extract the ledger"
             >
               <Sparkles size={16} />
-              Use Yardi
+              Fetch ERD ledger
             </button>
             <button
               className="soft-button ledger-upload-action"
@@ -2678,7 +2710,7 @@ function BankBoard({
               <p className="eyebrow">Agent output</p>
               <h2>Reconciliation workspace</h2>
             </div>
-            <span>Statement and Yardi ledger stay paired through review</span>
+            <span>Statement and ERD ledger stay paired through review</span>
           </div>
           <div className="bank-grid comparison-list">
             {uploadedBanks.map((bank) => (
@@ -2721,11 +2753,10 @@ function BankTile({
   return (
     <motion.article
       layout
-      className={`bank-tile ${active ? "active" : ""} ${hasFile ? "uploaded" : ""} ${!hasFile && locked ? "not-included" : ""}`}
+      className={`bank-tile ${active ? "active" : ""} ${stage === "scanning" ? "scanning" : ""} ${hasFile ? "uploaded" : ""} ${!hasFile && locked ? "not-included" : ""}`}
       whileHover={{ y: -1 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
     >
-      {stage === "scanning" && <motion.div className="scan-line" layoutId={`scan-${bank.id}`} />}
       <div className="bank-main-line">
         <div className="bank-identity">
           <span className={`bank-logo statement-bank-logo ${bank.brandClass}`} aria-hidden="true">
@@ -3363,6 +3394,7 @@ function ObservabilityRail({
   const [railTab, setRailTab] = useState("agent-work");
   const agents = getAgentRailItems({ runState, activeStep, runTotals, yardiProgress, yardiStepIndex });
   const activeAgent = agents.find((agent) => agent.status === "active");
+  const hasActiveAgent = Boolean(activeAgent);
   const focusAgent = activeAgent || [...agents].reverse().find((agent) => agent.status === "complete");
   const focusAgentId = focusAgent?.id || "";
   const completedAgentCount = agents.filter((agent) => agent.status === "complete").length;
@@ -3429,6 +3461,7 @@ function ObservabilityRail({
                         key={agent.id}
                         agent={agent}
                         expanded={expandedAgentId === agent.id}
+                        dimmed={hasActiveAgent && agent.status !== "active"}
                         onToggle={() =>
                           setExpandedAgentId((current) => (current === agent.id ? "" : agent.id))
                         }
@@ -3447,12 +3480,12 @@ function ObservabilityRail({
   );
 }
 
-function AgentRailAccordion({ agent, expanded, onToggle }) {
+function AgentRailAccordion({ agent, expanded, dimmed, onToggle }) {
   const StatusIcon =
     agent.status === "complete" ? CheckCircle2 : agent.status === "active" ? Loader2 : CircleDot;
 
   return (
-    <section className={`agent-accordion ${agent.status}`}>
+    <section className={`agent-accordion ${agent.status} ${dimmed ? "dimmed" : ""}`}>
       <button
         className="agent-accordion-button"
         type="button"
@@ -3481,10 +3514,18 @@ function AgentRailAccordion({ agent, expanded, onToggle }) {
             {agent.timeline.length > 0 ? (
               <ol className="agent-step-list">
                 {agent.timeline.map((step, index) => {
-                  const isCurrent = agent.status === "active" && index === agent.timeline.length - 1;
+                  const isCurrent = step.state === "current";
                   return (
-                    <li key={`${agent.id}-${step.title}`} className={isCurrent ? "current" : "done"}>
-                      <span>{isCurrent ? <Loader2 size={12} className="spin" /> : <CheckCircle2 size={12} />}</span>
+                    <li key={`${agent.id}-${step.title}`} className={step.state}>
+                      <span>
+                        {isCurrent ? (
+                          <Loader2 size={12} className="spin" />
+                        ) : step.state === "done" ? (
+                          <CheckCircle2 size={12} />
+                        ) : (
+                          <CircleDot size={12} />
+                        )}
+                      </span>
                       <div>
                         <strong>{step.title}</strong>
                         <small>{step.copy}</small>
