@@ -10,7 +10,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  CircleAlert,
   CheckCircle2,
   CircleDot,
   ClipboardCheck,
@@ -20,7 +19,6 @@ import {
   Home,
   Inbox,
   Loader2,
-  Lock,
   MessageCircle,
   MoreHorizontal,
   PanelRightClose,
@@ -28,7 +26,6 @@ import {
   Pencil,
   PlayCircle,
   Plus,
-  RefreshCw,
   Save,
   Search,
   Send,
@@ -44,6 +41,7 @@ import "./styles.css";
 import bankOfAmericaLogo from "../company logos/bank-of-america-logo 1.png";
 import chaseLogo from "../company logos/Chase-National-Bank-Logo 1.png";
 import wellsFargoLogo from "../company logos/Wells_Fargo_Bank.svg 1.png";
+import statementFileArt from "../File SVG.svg";
 
 const banks = [
   {
@@ -2616,19 +2614,14 @@ function BankBoard({
   const comparisonMode = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
   const uploadedBanks = banks.filter((bank) => uploaded[bank.id]);
   const readyCopy = `${uploadedBanks.length} statement${uploadedBanks.length === 1 ? "" : "s"} ready`;
-  const headingHint =
-    runState === "draft"
-      ? "Upload statements"
-      : "Statements stay visible";
 
   return (
     <section className="bank-board" aria-label="Associated property banks">
       <div className="board-heading">
-        <div>
-          <p className="eyebrow">Associated banks</p>
-          <h2>Statement workspace</h2>
+        <div className="board-title-line">
+          <FileText size={16} />
+          <h2>Bank statements</h2>
         </div>
-        <span>{headingHint}</span>
       </div>
       <div className="bank-grid statement-list">
         {banks.map((bank) => (
@@ -2720,8 +2713,12 @@ function BankTile({
   const locked = runState !== "draft";
   const hasFile = Boolean(uploaded);
   const statusStage = hasFile ? stage : locked ? "not-included" : "waiting";
-  const uploadActionLabel = hasFile ? (locked ? "Statement locked" : "Replace file") : "Upload statement";
-  const UploadActionIcon = locked && hasFile ? Lock : hasFile ? RefreshCw : Upload;
+  const uploadActionLabel = hasFile
+    ? locked
+      ? `${bank.shortName} statement uploaded`
+      : `Replace ${bank.shortName} statement`
+    : `Upload ${bank.shortName} statement`;
+  const showStage = hasFile && statusStage !== "waiting";
 
   return (
     <motion.article
@@ -2732,36 +2729,40 @@ function BankTile({
     >
       {stage === "scanning" && <motion.div className="scan-line" layoutId={`scan-${bank.id}`} />}
       <div className="bank-main-line">
-        <div className={`bank-logo ${bank.brandClass}`} aria-hidden="true">
-          <img src={bank.logo} alt="" />
-        </div>
         <div className="bank-identity">
+          <span className={`bank-logo statement-bank-logo ${bank.brandClass}`} aria-hidden="true">
+            <img src={bank.logo} alt="" />
+          </span>
           <strong>{bank.shortName}</strong>
-          <span>{bank.type}</span>
         </div>
-        <StageBadge stage={statusStage} />
-        <div className="statement-actions">
-          {locked && !hasFile ? (
-            <span className="statement-static-note">Not part of this run</span>
+        {showStage && <StageBadge stage={statusStage} />}
+        <button
+          className={`statement-file-action ${hasFile ? "has-file" : "empty"}`}
+          type="button"
+          disabled={locked}
+          onClick={onUpload}
+          aria-label={uploadActionLabel}
+        >
+          {hasFile ? (
+            <>
+              <FileText size={15} />
+              <span>{bank.statement}</span>
+            </>
           ) : (
-            <button className="micro-button" disabled={locked} onClick={onUpload}>
-              <UploadActionIcon size={14} />
-              {uploadActionLabel}
-            </button>
+            <img className="statement-file-art" src={statementFileArt} alt="" />
           )}
-          {hasFile && !locked && (
-            <button
-              className="icon-button ghost statement-remove-button"
-              type="button"
-              onClick={onRemove}
-              aria-label={`Remove ${bank.shortName} statement`}
-              title="Remove statement"
-            >
-              <X size={14} />
-            </button>
-          )}
-          {hasFile && <SummaryHover bank={bank} kind="statement" />}
-        </div>
+        </button>
+        {hasFile && !locked && (
+          <button
+            className="icon-button ghost statement-remove-button"
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${bank.shortName} statement`}
+            title="Remove statement"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
     </motion.article>
   );
@@ -2939,23 +2940,6 @@ function ComparisonBridge({ progress, runState, matchRate }) {
         {bridgeValue}
       </span>
     </div>
-  );
-}
-
-function SummaryHover({ bank, kind }) {
-  return (
-    <span className="summary-trigger" tabIndex="0" aria-label={`${bank.shortName} parsed statement details`}>
-      <CircleAlert size={13} />
-      <span className="summary-popover" aria-hidden="true">
-        <strong>{kind === "statement" ? "Parsed statement summary" : "Ledger summary"}</strong>
-        <span>{bank.type}</span>
-        <span>{bank.transactions} transactions</span>
-        <span>Inflow {bank.inflow}</span>
-        <span>Outflow {bank.outflow}</span>
-        <span>Balance {bank.balance}</span>
-        <span>Schema confidence {bank.confidence}</span>
-      </span>
-    </span>
   );
 }
 

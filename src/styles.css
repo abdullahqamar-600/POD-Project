@@ -2264,11 +2264,23 @@ select:disabled {
 .board-heading {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: center;
+}
+
+.board-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.board-title-line svg {
+  color: var(--muted);
+  flex: 0 0 auto;
 }
 
 .board-heading h2 {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: 15px;
   letter-spacing: 0;
   font-weight: 500;
@@ -2574,9 +2586,9 @@ select:disabled {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface);
-  padding: 10px;
+  padding: 12px;
   display: grid;
-  min-height: 132px;
+  min-height: 116px;
 }
 
 .bank-tile.active {
@@ -2590,6 +2602,10 @@ select:disabled {
 
 .bank-tile.not-included .bank-logo {
   opacity: 0.72;
+}
+
+.bank-tile.not-included .statement-file-action.empty {
+  opacity: 0.58;
 }
 
 .scan-line {
@@ -2620,20 +2636,19 @@ select:disabled {
 }
 
 .bank-main-line {
+  position: relative;
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "logo title"
-    "logo status"
-    "actions actions";
+    "title status"
+    "file file";
   align-items: center;
   align-content: start;
-  gap: 6px 10px;
+  gap: 10px 8px;
   min-width: 0;
 }
 
 .bank-logo {
-  grid-area: logo;
   width: 64px;
   height: 48px;
   border-radius: 10px;
@@ -2659,11 +2674,14 @@ select:disabled {
 .bank-identity {
   grid-area: title;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .bank-identity strong {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
   overflow: hidden;
@@ -2671,91 +2689,110 @@ select:disabled {
   white-space: nowrap;
 }
 
-.bank-identity span {
-  color: var(--muted);
-  font-size: 11px;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 2px;
+.statement-bank-logo {
+  width: 40px;
+  height: 30px;
+  border-radius: 8px;
+  flex: 0 0 40px;
+  border-color: rgba(226, 226, 231, 0.7);
+}
+
+.statement-bank-logo.chase {
+  width: 40px;
+  flex-basis: 40px;
 }
 
 .bank-main-line .stage-badge {
   grid-area: status;
-  justify-self: start;
+  justify-self: end;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.summary-trigger {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-self: end;
-  margin-left: auto;
-  color: var(--muted);
-}
-
-.summary-popover {
-  position: absolute;
-  right: -6px;
-  bottom: 22px;
-  z-index: 30;
-  width: 230px;
-  padding: 12px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--canvas-dark);
-  color: var(--on-dark);
-  box-shadow: 0 18px 50px rgba(7, 7, 10, 0.22);
-  display: grid;
-  gap: 5px;
-  opacity: 0;
-  transform: translateY(4px);
-  pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.16s ease;
-}
-
-.summary-popover strong,
-.summary-popover span {
-  color: inherit;
-  white-space: normal;
-}
-
-.summary-popover span {
-  font-size: 12px;
-  color: var(--on-dark-mute);
-}
-
-.summary-trigger:hover .summary-popover,
-.summary-trigger:focus .summary-popover {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.statement-actions {
-  grid-area: actions;
+.statement-file-action {
+  grid-area: file;
+  width: 100%;
   min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  color: var(--body);
   display: flex;
   align-items: center;
   gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
-.statement-actions .micro-button {
-  flex: 1 1 auto;
+.statement-file-action:hover:not(:disabled) {
+  border-color: rgba(73, 79, 223, 0.34);
+  background: rgba(73, 79, 223, 0.06);
+}
+
+.statement-file-action.empty {
+  min-height: 62px;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.statement-file-action.has-file {
+  min-height: 38px;
+  padding: 7px 9px;
+}
+
+.statement-file-action.has-file svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.statement-file-action.has-file span {
   min-width: 0;
-  min-height: 30px;
   overflow: hidden;
-  padding: 2px 10px;
-  font-size: 12px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.statement-file-action:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.statement-file-art {
+  width: 66px;
+  height: auto;
+  display: block;
+  transform: translate(4px, 5px);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.statement-file-action.empty:hover .statement-file-art {
+  transform: translate(4px, 2px) scale(1.02);
 }
 
 .statement-remove-button {
-  flex: 0 0 30px;
+  position: absolute;
+  right: -5px;
+  top: 34px;
+  width: 26px;
+  height: 26px;
   color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 140ms ease, transform 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.bank-tile:hover .statement-remove-button,
+.statement-remove-button:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .statement-remove-button:hover {
