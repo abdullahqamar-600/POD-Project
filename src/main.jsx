@@ -2765,20 +2765,21 @@ function BankTile({
           <strong>{bank.shortName}</strong>
         </div>
         <button
-          className={`statement-file-action ${hasFile ? "has-file" : "empty"}`}
+          className={`statement-file-action ${hasFile ? "has-file" : "empty"} ${stage === "scanning" ? "is-scanning" : ""}`}
           type="button"
           disabled={locked}
           onClick={onUpload}
           aria-label={uploadActionLabel}
+          title={hasFile ? bank.statement : uploadActionLabel}
         >
-          {hasFile ? (
-            <>
-              <FileText size={15} />
-              <span>{bank.statement}</span>
-            </>
-          ) : (
+          <span className="statement-file-object">
             <img className="statement-file-art" src={statementFileArt} alt="" />
-          )}
+            {hasFile && (
+              <span className={`statement-file-state ${stage === "scanning" ? "scanning" : "uploaded"}`} aria-hidden="true">
+                {stage === "scanning" ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
+              </span>
+            )}
+          </span>
         </button>
         {hasFile && !locked && (
           <button
