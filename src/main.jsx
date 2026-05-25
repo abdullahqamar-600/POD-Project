@@ -1700,40 +1700,240 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
 }
 
 function DashboardScreen({ sessions, properties, onOpenSession, onNewSession }) {
-  const stats = getDashboardStats(sessions, properties);
-  const observabilityMetrics = [
+  const observedProperty = properties[0];
+  const pipelineAgents = [
+    { name: "Parsing", state: "Complete", latency: "1.6s", tokens: "2.8k", status: "complete" },
+    { name: "Reconciliation", state: "Complete", latency: "4.2s", tokens: "8.7k", status: "complete" },
+    { name: "Exception", state: "Complete", latency: "1.1s", tokens: "3.4k", status: "complete" },
+    { name: "Summary", state: "Idle", latency: "0.0s", tokens: "0", status: "idle" }
+  ];
+  const sessionMetrics = [
+    { label: "Banks reconciled", value: "3/3", meta: "All scoped banks" },
+    { label: "Approved records", value: "8", meta: "Sent to Yardi", tone: "good" },
+    { label: "Exceptions", value: "5", meta: "Needs review", tone: "attention" },
+    { label: "Automation rate", value: "94.8%", meta: "Resolved by agent" }
+  ];
+  const bankResults = [
     {
-      label: "Needs review",
-      value: stats.reviewItems,
-      meta: stats.reviewItems === 1 ? "exception" : "exceptions",
-      tone: "attention"
+      bank: banks[0],
+      account: "ending 4419",
+      confidence: "97%",
+      tone: "high",
+      summary: "Reconciliation matched 139 of 142 lines; 3 items need exception review.",
+      approved: 3,
+      exceptions: 2,
+      difference: "$42.50",
+      latency: "4.2s"
     },
-    { label: "Stalled handoffs", value: dashboardStalledHandoffCopy(stats.stalledHandoffs), meta: "pipeline moving", tone: "good" },
-    { label: "Match rate", value: `${stats.matchRate} ↑`, meta: stats.matchRateTrend, tone: "good" },
-    { label: "Sessions in flight", value: `${stats.runningSessions} of ${sessions.length}`, meta: "active close cycles" },
-    { label: "Avg run time", value: "12.4s", meta: "P95 18.1s" },
-    { label: "Trace health", value: "Stable", meta: "0 automation issues", tone: "good" }
+    {
+      bank: banks[1],
+      account: "ending 8821",
+      confidence: "94%",
+      tone: "high",
+      summary: "Reserve transfer and vendor EFT matched cleanly; one cutoff item remains.",
+      approved: 2,
+      exceptions: 1,
+      difference: "$0.00",
+      latency: "2.1s"
+    },
+    {
+      bank: banks[2],
+      account: "ending 1187",
+      confidence: "82%",
+      tone: "medium",
+      summary: "Security deposits mostly matched; one NSF reversal explains the variance.",
+      approved: 3,
+      exceptions: 2,
+      difference: "$1,250.00",
+      latency: "5.8s"
+    }
+  ];
+  const reasoningTrace = [
+    {
+      actor: "Agent",
+      title: "Matched exact records",
+      copy: "Amount, date, and reference matches cleared Chase and Wells Fargo lines."
+    },
+    {
+      actor: "Agent",
+      title: "Hypothesized split timing",
+      copy: "BofA NSF reversal looked like a ledger correction, not missing cash."
+    },
+    {
+      actor: "Reviewer",
+      title: "Confirmed treatment",
+      copy: "Timing records stayed approved. NSF remains flagged for controller review."
+    },
+    {
+      actor: "System",
+      title: "Guidance captured",
+      copy: "Rule saved for future NSF reversals and passed to the Summary stage."
+    }
+  ];
+  const tokenBars = [
+    { label: "Parsing", value: "2.8k", percent: 32 },
+    { label: "Reconciliation", value: "8.7k", percent: 100 },
+    { label: "Exception", value: "3.4k", percent: 39 },
+    { label: "Summary", value: "0", percent: 0 }
+  ];
+  const latencyBars = [
+    { label: "Parsing", value: "1.6s", percent: 38 },
+    { label: "Reconciliation", value: "4.2s", percent: 100 },
+    { label: "Exception", value: "1.1s", percent: 26 },
+    { label: "Summary", value: "0.0s", percent: 0 }
+  ];
+  const anomalySignals = [
+    "BofA match rate 82% vs 94% avg last 3 cycles",
+    "5 exceptions vs avg 2.1",
+    "Reconciliation latency up 18% from April"
+  ];
+  const riskRows = [
+    { agent: "Parsing", risk: "Low" },
+    { agent: "Reconciliation", risk: "Medium" },
+    { agent: "Exception", risk: "Medium" },
+    { agent: "Summary", risk: "Idle" }
+  ];
+  const feedbackSignals = [
+    { label: "Approved as-is", value: "8" },
+    { label: "Moved to exceptions", value: "1" },
+    { label: "Moved to approved", value: "0" },
+    { label: "Rules captured", value: "3" }
+  ];
+  const eventTimeline = [
+    { time: "09:02", type: "user", title: "Statements uploaded" },
+    { time: "09:03", type: "agent", title: "Parsing completed" },
+    { time: "09:08", type: "agent", title: "Reconciliation completed" },
+    { time: "09:10", type: "reviewer", title: "Exception feedback saved" },
+    { time: "09:12", type: "system", title: "Summary waiting on Yardi handoff" }
   ];
 
   return (
     <section className="dashboard-canvas" aria-label="Dashboard">
-      <section className="dashboard-observability-strip" aria-label="AI observability summary">
-        <div className="dashboard-observability-copy">
-          <p className="eyebrow">AI observability</p>
-          <h1>{dashboardReviewHeadline(stats.reviewItems)}</h1>
-          <p>
-            {stats.runningSessions} of {sessions.length} sessions in flight. Agent handoffs are clear.
-          </p>
-        </div>
-        <div className="dashboard-metric-grid">
-          {observabilityMetrics.map((metric) => (
-            <div className={`dashboard-metric ${metric.tone || ""}`} key={metric.label}>
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-              <small>{metric.meta}</small>
+      <section className="dashboard-observability-strip" aria-label="AI observability">
+        <div className="dashboard-observability-main">
+          <div className="dashboard-observability-heading">
+            <div>
+              <p className="eyebrow">AI observability</p>
+              <h1>{observedProperty.name} review run</h1>
+              <p>
+                May 2026 · {getPropertyBankCount(observedProperty)} banks · Controller review ready
+              </p>
             </div>
-          ))}
+            <span className="observability-status">
+              <CheckCircle2 size={15} />
+              Ready
+            </span>
+          </div>
+
+          <div className="agent-pipeline-bar" aria-label="Agent pipeline">
+            {pipelineAgents.map((agent) => (
+              <DashboardAgentChip key={agent.name} agent={agent} />
+            ))}
+          </div>
+
+          <div className="session-metric-strip" aria-label="Session metrics">
+            {sessionMetrics.map((metric) => (
+              <DashboardMetricCell key={metric.label} metric={metric} />
+            ))}
+          </div>
+
+          <section className="dashboard-subsection bank-results-section" aria-label="Per-bank results">
+            <div className="dashboard-subsection-head">
+              <div>
+                <p className="eyebrow">Per-bank results</p>
+                <h2>Statement and Yardi outcomes</h2>
+              </div>
+              <span>Lowest confidence surfaces first in review</span>
+            </div>
+            <div className="bank-results-table">
+              <div className="bank-results-columns" aria-hidden="true">
+                <span>Bank</span>
+                <span>Confidence</span>
+                <span>Agent summary</span>
+                <span>Approved</span>
+                <span>Exceptions</span>
+                <span>Net diff</span>
+                <span>Latency</span>
+              </div>
+              {bankResults.map((result) => (
+                <DashboardBankResult key={result.bank.id} result={result} />
+              ))}
+            </div>
+          </section>
+
+          <section className="dashboard-subsection reasoning-trace-section" aria-label="Agent reasoning trace">
+            <div className="dashboard-subsection-head">
+              <div>
+                <p className="eyebrow">Reasoning trace</p>
+                <h2>Why the package needs review</h2>
+              </div>
+            </div>
+            <ol className="reasoning-trace-list">
+              {reasoningTrace.map((step, index) => (
+                <DashboardTraceStep key={`${step.actor}-${step.title}`} step={step} index={index} />
+              ))}
+            </ol>
+          </section>
         </div>
+
+        <aside className="dashboard-observability-rail" aria-label="Operational signals">
+          <DashboardRailBlock title="Token usage" meta="14.9k total">
+            <div className="mini-bar-list">
+              {tokenBars.map((bar) => (
+                <MiniDashboardBar key={bar.label} bar={bar} tone="token" />
+              ))}
+            </div>
+          </DashboardRailBlock>
+
+          <DashboardRailBlock title="Agent latency" meta="6.9s total">
+            <div className="mini-bar-list">
+              {latencyBars.map((bar) => (
+                <MiniDashboardBar key={bar.label} bar={bar} tone="latency" />
+              ))}
+            </div>
+          </DashboardRailBlock>
+
+          <DashboardRailBlock title="Anomaly signals" meta="3 flags">
+            <div className="dashboard-anomaly-list">
+              {anomalySignals.map((signal) => (
+                <span key={signal}>
+                  <AlertTriangle size={13} />
+                  {signal}
+                </span>
+              ))}
+            </div>
+          </DashboardRailBlock>
+
+          <DashboardRailBlock title="Confidence risk" meta="Agent certainty">
+            <div className="dashboard-risk-list">
+              {riskRows.map((row) => (
+                <div key={row.agent}>
+                  <span>{row.agent}</span>
+                  <strong className={row.risk.toLowerCase()}>{row.risk}</strong>
+                </div>
+              ))}
+            </div>
+          </DashboardRailBlock>
+
+          <DashboardRailBlock title="Reviewer feedback" meta="This cycle">
+            <div className="dashboard-feedback-grid">
+              {feedbackSignals.map((signal) => (
+                <div key={signal.label}>
+                  <strong>{signal.value}</strong>
+                  <span>{signal.label}</span>
+                </div>
+              ))}
+            </div>
+          </DashboardRailBlock>
+
+          <DashboardRailBlock title="Event timeline" meta="Audit stream">
+            <ol className="dashboard-event-list">
+              {eventTimeline.map((event) => (
+                <DashboardEventItem key={`${event.time}-${event.title}`} event={event} />
+              ))}
+            </ol>
+          </DashboardRailBlock>
+        </aside>
       </section>
 
       <section className="dashboard-session-workspace" aria-label="Session workspace">
@@ -1783,6 +1983,118 @@ function DashboardScreen({ sessions, properties, onOpenSession, onNewSession }) 
         </div>
       </section>
     </section>
+  );
+}
+
+function DashboardAgentChip({ agent }) {
+  const StatusIcon =
+    agent.status === "complete" ? CheckCircle2 : agent.status === "running" ? Loader2 : CircleDot;
+
+  return (
+    <div className={`dashboard-agent-chip ${agent.status}`}>
+      <span className="dashboard-agent-state">
+        <StatusIcon size={15} className={agent.status === "running" ? "spin" : ""} />
+      </span>
+      <div>
+        <strong>{agent.name}</strong>
+        <span>{agent.state}</span>
+      </div>
+      <dl>
+        <div>
+          <dt>Time</dt>
+          <dd>{agent.latency}</dd>
+        </div>
+        <div>
+          <dt>Tokens</dt>
+          <dd>{agent.tokens}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+function DashboardMetricCell({ metric }) {
+  return (
+    <div className={`dashboard-metric-cell ${metric.tone || ""}`}>
+      <span>{metric.label}</span>
+      <strong>{metric.value}</strong>
+      <small>{metric.meta}</small>
+    </div>
+  );
+}
+
+function DashboardBankResult({ result }) {
+  return (
+    <div className="dashboard-bank-result">
+      <div className="dashboard-bank-identity">
+        <span className={`mini-bank-logo ${result.bank.brandClass}`}>
+          <img src={result.bank.logo} alt="" />
+        </span>
+        <div>
+          <strong>{result.bank.shortName}</strong>
+          <span>{result.account}</span>
+        </div>
+      </div>
+      <span className={`dashboard-confidence ${result.tone}`}>{result.confidence}</span>
+      <p>{result.summary}</p>
+      <strong>{result.approved}</strong>
+      <strong className="attention-text">{result.exceptions}</strong>
+      <strong>{result.difference}</strong>
+      <span>{result.latency}</span>
+    </div>
+  );
+}
+
+function DashboardTraceStep({ step, index }) {
+  const Icon = step.actor === "Reviewer" ? MessageCircle : step.actor === "System" ? Workflow : Sparkles;
+
+  return (
+    <li className={`dashboard-trace-step ${step.actor.toLowerCase()}`}>
+      <span className="dashboard-trace-index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="dashboard-trace-icon">
+        <Icon size={15} />
+      </span>
+      <div>
+        <span>{step.actor}</span>
+        <strong>{step.title}</strong>
+        <p>{step.copy}</p>
+      </div>
+    </li>
+  );
+}
+
+function DashboardRailBlock({ title, meta, children }) {
+  return (
+    <section className="dashboard-rail-block">
+      <div className="dashboard-rail-block-head">
+        <strong>{title}</strong>
+        <span>{meta}</span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function MiniDashboardBar({ bar, tone }) {
+  return (
+    <div className={`mini-dashboard-bar ${tone}`} style={{ "--bar-value": `${bar.percent}%` }}>
+      <div>
+        <span>{bar.label}</span>
+        <strong>{bar.value}</strong>
+      </div>
+      <span className="mini-dashboard-track">
+        <span />
+      </span>
+    </div>
+  );
+}
+
+function DashboardEventItem({ event }) {
+  return (
+    <li className={event.type}>
+      <span>{event.time}</span>
+      <strong>{event.title}</strong>
+    </li>
   );
 }
 
