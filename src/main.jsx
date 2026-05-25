@@ -2645,7 +2645,7 @@ function BankBoard({
 }) {
   const comparisonMode = ["reconciling", "review", "updating-yardi", "complete"].includes(runState);
   const uploadedBanks = banks.filter((bank) => uploaded[bank.id]);
-  const readyCopy = `${uploadedBanks.length} statement${uploadedBanks.length === 1 ? "" : "s"} ready`;
+  const readyCopy = `${uploadedBanks.length} of ${banks.length} uploaded`;
 
   return (
     <section className="bank-board" aria-label="Associated property banks">

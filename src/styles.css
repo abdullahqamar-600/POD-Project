@@ -2304,8 +2304,8 @@ select:disabled {
 
 .statement-list {
   align-items: stretch;
-  gap: 0;
-  margin-top: 2px;
+  gap: 18px;
+  margin-top: 4px;
 }
 
 .bank-grid.comparison-list {
@@ -2591,17 +2591,13 @@ select:disabled {
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 8px 16px 10px;
+  padding: 6px 8px 12px;
   display: grid;
-  min-height: 128px;
+  min-height: 152px;
 }
 
 .bank-tile.active {
   box-shadow: none;
-}
-
-.statement-list .bank-tile + .bank-tile {
-  border-left: 1px solid var(--hairline);
 }
 
 .bank-tile.not-included {
@@ -2623,9 +2619,9 @@ select:disabled {
   grid-template-areas:
     "title"
     "file";
-  align-items: center;
+  align-items: start;
   align-content: start;
-  gap: 6px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -2657,7 +2653,7 @@ select:disabled {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
 }
 
 .bank-identity strong {
@@ -2671,16 +2667,25 @@ select:disabled {
 }
 
 .statement-bank-logo {
-  width: 40px;
-  height: 30px;
-  border-radius: 8px;
-  flex: 0 0 40px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  flex: 0 0 38px;
+  padding: 5px;
+  box-sizing: border-box;
+  background: var(--surface);
   border-color: rgba(226, 226, 231, 0.7);
 }
 
 .statement-bank-logo.chase {
-  width: 40px;
-  flex-basis: 40px;
+  width: 38px;
+  flex-basis: 38px;
+}
+
+.statement-bank-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .statement-file-action {
@@ -2715,7 +2720,7 @@ select:disabled {
 }
 
 .statement-file-action.empty {
-  min-height: 84px;
+  min-height: 96px;
   justify-content: center;
   padding: 0;
   border: 0;
@@ -2723,7 +2728,7 @@ select:disabled {
 }
 
 .statement-file-action.has-file {
-  min-height: 84px;
+  min-height: 96px;
   justify-content: center;
   padding: 0;
   border: 0;
@@ -2762,28 +2767,24 @@ select:disabled {
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 102px;
-  min-height: 96px;
+  width: 116px;
+  min-height: 110px;
   overflow: visible;
   transform: translateY(0);
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .statement-file-art {
-  width: 88px;
+  width: 98px;
   height: auto;
   display: block;
-  transform: translate(6px, 7px);
+  transform: translate(7px, 8px);
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .statement-file-action.has-file .statement-file-object {
   transform: translateY(-5px);
   filter: drop-shadow(0 9px 14px rgba(18, 20, 24, 0.12));
-}
-
-.statement-file-action.has-file .statement-file-art {
-  transform: translate(6px, 1px) scale(1.03);
 }
 
 .statement-file-action:hover .statement-file-object {
@@ -2795,13 +2796,13 @@ select:disabled {
 }
 
 .statement-file-action.empty:hover .statement-file-art {
-  transform: translate(6px, 2px) scale(1.02);
+  transform: translate(7px, 4px);
 }
 
 .statement-file-state {
   position: absolute;
-  right: 7px;
-  bottom: 6px;
+  right: 8px;
+  bottom: 7px;
   z-index: 3;
   width: 22px;
   height: 22px;
