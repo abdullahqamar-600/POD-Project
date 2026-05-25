@@ -1915,16 +1915,16 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
     dashboardRows.reduce((sum, row) => sum + row.automation, 0) / Math.max(dashboardRows.length, 1)
   );
   const pipelineAgents = [
-    { name: "Parsing", latency: "1.9s", tokens: "2.3k" },
-    { name: "Reconciliation", latency: "4.1s", tokens: "6.8k" },
-    { name: "Exception", latency: "1.1s", tokens: "2.1k" },
-    { name: "Summary", latency: "0.8s", tokens: "0.9k" }
+    { name: "Parsing", latency: "1.9s", tokens: "2.3k", load: 34 },
+    { name: "Reconciliation", latency: "4.1s", tokens: "6.8k", load: 88 },
+    { name: "Exception", latency: "1.1s", tokens: "2.1k", load: 42 },
+    { name: "Summary", latency: "0.8s", tokens: "0.9k", load: 18 }
   ];
   const sessionMetrics = [
-    { label: "Banks reconciled", value: `${banksDone}/${banksTotal}`, meta: "Resolved across sessions" },
-    { label: "Approved posted", value: String(approvedTotal), meta: "Sent to Yardi", tone: "good" },
-    { label: "Exceptions", value: String(exceptionTotal), meta: "Need controller attention", tone: "attention" },
-    { label: "Automation rate", value: `${automationRate}%`, meta: "Portfolio average" }
+    { label: "Banks reconciled", value: `${banksDone}/${banksTotal}`, meta: "Resolved across sessions", spark: [42, 52, 48, 61, 55, 67, 72] },
+    { label: "Approved posted", value: String(approvedTotal), meta: "Sent to Yardi", tone: "good", spark: [30, 38, 44, 52, 62, 69, 78] },
+    { label: "Exceptions", value: String(exceptionTotal), meta: "Need controller attention", tone: "attention", spark: [70, 58, 64, 52, 49, 44, 38] },
+    { label: "Automation rate", value: `${automationRate}%`, meta: "Portfolio average", spark: [56, 60, 58, 63, 66, 69, 68] }
   ];
 
   return (
@@ -2024,7 +2024,7 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
 
 function DashboardAgentChip({ agent }) {
   return (
-    <div className="dashboard-agent-chip">
+    <div className="dashboard-agent-chip" style={{ "--agent-load": `${agent.load}%` }}>
       <strong>{agent.name}</strong>
       <dl>
         <div>
@@ -2036,6 +2036,9 @@ function DashboardAgentChip({ agent }) {
           <dd>{agent.tokens}</dd>
         </div>
       </dl>
+      <span className="dashboard-agent-load" aria-hidden="true">
+        <span />
+      </span>
     </div>
   );
 }
@@ -2046,6 +2049,17 @@ function DashboardMetricCell({ metric }) {
       <span>{metric.label}</span>
       <strong>{metric.value}</strong>
       <small>{metric.meta}</small>
+      <DashboardMetricSpark values={metric.spark} tone={metric.tone} />
+    </div>
+  );
+}
+
+function DashboardMetricSpark({ values, tone }) {
+  return (
+    <div className={`dashboard-metric-spark ${tone || ""}`} aria-hidden="true">
+      {values.map((value, index) => (
+        <i key={`${value}-${index}`} style={{ "--spark-height": `${value}%` }} />
+      ))}
     </div>
   );
 }
