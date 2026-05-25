@@ -1928,94 +1928,96 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
   ];
 
   return (
-    <section className="dashboard-canvas" aria-label="Dashboard">
-      <section className="dashboard-observability-strip" aria-label="AI observability">
-        <section className="dashboard-metric-panel" aria-label="Portfolio metrics">
-          <h2>Portfolio metrics</h2>
-          <div className="session-metric-strip" aria-label="Portfolio session metrics">
-            {sessionMetrics.map((metric) => (
-              <DashboardMetricCell key={metric.label} metric={metric} />
-            ))}
-          </div>
-        </section>
-
-        <section className="dashboard-agent-panel" aria-label="Agent overview">
-          <h2>Agent overview</h2>
-          <div className="agent-pipeline-bar" aria-label="Average agent pipeline">
-            {pipelineAgents.map((agent) => (
-              <DashboardAgentChip key={agent.name} agent={agent} />
-            ))}
-          </div>
-        </section>
-      </section>
-
-      <section className="dashboard-session-workspace" aria-label="Session overview">
-        <div className="dashboard-workspace-head">
-          <div>
-            <h2>Session overview</h2>
-            <p>Select a row to inspect token usage, latency, and anomalies.</p>
-          </div>
-          <button className="primary-button dashboard-new-session" type="button" onClick={onNewSession}>
-            <Plus size={14} />
-            New session
-          </button>
-        </div>
-
-        <div className={`dashboard-workspace-grid ${selectedInsight ? "has-insight" : ""}`}>
-          <div className="dashboard-session-list" aria-label="Reconciliation sessions">
-            <div className="dashboard-session-columns" aria-hidden="true">
-              <span>Session</span>
-              <span>Summary</span>
-              <span>Confidence</span>
-              <span>Record exceptions</span>
-              <span>Records posted</span>
-              <span>Total time</span>
-              <span />
-            </div>
-            <div className="dashboard-session-rows">
-              {dashboardRows.map((row) => (
-                <button
-                  className={`dashboard-session-row ${selectedInsight?.id === row.id ? "selected" : ""}`}
-                  key={row.id}
-                  type="button"
-                  aria-pressed={selectedInsight?.id === row.id}
-                  onClick={() => setSelectedInsightId(row.id)}
-                >
-                  <span className="dashboard-session-name">
-                    <strong>{row.property}</strong>
-                    <small>{row.cycle} · {row.accountant}</small>
-                  </span>
-                  <span className="dashboard-session-summary">
-                    <strong>{row.summary}</strong>
-                    <small>{row.banksDone}/{row.bankCount} banks</small>
-                  </span>
-                  {row.stage === "Needs input" ? (
-                    <span className="dashboard-confidence empty" aria-label="No confidence yet">-</span>
-                  ) : (
-                    <DashboardConfidenceBadge value={row.confidence} tone={row.confidenceTone} />
-                  )}
-                  <strong className="dashboard-session-number attention-text">{row.exceptions}</strong>
-                  <strong className="dashboard-session-number">{row.approved}</strong>
-                  <span className="dashboard-session-time">{row.duration}</span>
-                  <span className="dashboard-session-action" aria-hidden="true">
-                    <ChevronRight size={16} />
-                  </span>
-                </button>
+    <section className={`dashboard-canvas ${selectedInsight ? "has-dashboard-insight" : ""}`} aria-label="Dashboard">
+      <div className="dashboard-main-stack">
+        <section className="dashboard-observability-strip" aria-label="AI observability">
+          <section className="dashboard-metric-panel" aria-label="Portfolio metrics">
+            <h2>Portfolio metrics</h2>
+            <div className="session-metric-strip" aria-label="Portfolio session metrics">
+              {sessionMetrics.map((metric) => (
+                <DashboardMetricCell key={metric.label} metric={metric} />
               ))}
             </div>
+          </section>
+
+          <section className="dashboard-agent-panel" aria-label="Agent overview">
+            <h2>Agent overview</h2>
+            <div className="agent-pipeline-bar" aria-label="Average agent pipeline">
+              {pipelineAgents.map((agent) => (
+                <DashboardAgentChip key={agent.name} agent={agent} />
+              ))}
+            </div>
+          </section>
+        </section>
+
+        <section className="dashboard-session-workspace" aria-label="Session overview">
+          <div className="dashboard-workspace-head">
+            <div>
+              <h2>Session overview</h2>
+              <p>Select a row to inspect token usage, latency, and anomalies.</p>
+            </div>
+            <button className="primary-button dashboard-new-session" type="button" onClick={onNewSession}>
+              <Plus size={14} />
+              New session
+            </button>
           </div>
 
-          <AnimatePresence initial={false}>
-            {selectedInsight && (
-              <DashboardInsightRail
-                key={selectedInsight.id}
-                insight={selectedInsight}
-                onClose={() => setSelectedInsightId(null)}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-      </section>
+          <div className="dashboard-workspace-grid">
+            <div className="dashboard-session-list" aria-label="Reconciliation sessions">
+              <div className="dashboard-session-columns" aria-hidden="true">
+                <span>Session</span>
+                <span>Summary</span>
+                <span>Confidence</span>
+                <span>Record exceptions</span>
+                <span>Records posted</span>
+                <span>Total time</span>
+                <span />
+              </div>
+              <div className="dashboard-session-rows">
+                {dashboardRows.map((row) => (
+                  <button
+                    className={`dashboard-session-row ${selectedInsight?.id === row.id ? "selected" : ""}`}
+                    key={row.id}
+                    type="button"
+                    aria-pressed={selectedInsight?.id === row.id}
+                    onClick={() => setSelectedInsightId(row.id)}
+                  >
+                    <span className="dashboard-session-name">
+                      <strong>{row.property}</strong>
+                      <small>{row.cycle} · {row.accountant}</small>
+                    </span>
+                    <span className="dashboard-session-summary">
+                      <strong>{row.summary}</strong>
+                      <small>{row.banksDone}/{row.bankCount} banks</small>
+                    </span>
+                    {row.stage === "Needs input" ? (
+                      <span className="dashboard-confidence empty" aria-label="No confidence yet">-</span>
+                    ) : (
+                      <DashboardConfidenceBadge value={row.confidence} tone={row.confidenceTone} />
+                    )}
+                    <strong className="dashboard-session-number attention-text">{row.exceptions}</strong>
+                    <strong className="dashboard-session-number">{row.approved}</strong>
+                    <span className="dashboard-session-time">{row.duration}</span>
+                    <span className="dashboard-session-action" aria-hidden="true">
+                      <ChevronRight size={16} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {selectedInsight && (
+          <DashboardInsightRail
+            key={selectedInsight.id}
+            insight={selectedInsight}
+            onClose={() => setSelectedInsightId(null)}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }
