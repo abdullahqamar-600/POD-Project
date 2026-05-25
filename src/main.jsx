@@ -41,7 +41,9 @@ import "./styles.css";
 import bankOfAmericaLogo from "../company logos/bank-of-america-logo 1.png";
 import chaseLogo from "../company logos/Chase-National-Bank-Logo 1.png";
 import wellsFargoLogo from "../company logos/Wells_Fargo_Bank.svg 1.png";
-import statementFileArt from "../File SVG.svg";
+import statementFileIcon from "../File SVG/File Icon.svg";
+import statementUploadIcon from "../File SVG/Upload BUtton.svg";
+import statementUploadedIcon from "../File SVG/Uploaded Check Icon.svg";
 
 const banks = [
   {
@@ -2773,12 +2775,10 @@ function BankTile({
           title={hasFile ? bank.statement : uploadActionLabel}
         >
           <span className="statement-file-object">
-            <img className="statement-file-art" src={statementFileArt} alt="" />
-            {hasFile && (
-              <span className={`statement-file-state ${stage === "scanning" ? "scanning" : "uploaded"}`} aria-hidden="true">
-                {stage === "scanning" ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
-              </span>
-            )}
+            <img className="statement-file-art" src={statementFileIcon} alt="" />
+            <span className={`statement-file-state ${stage === "scanning" ? "scanning" : hasFile ? "uploaded" : "empty"}`} aria-hidden="true">
+              <img src={hasFile && stage !== "scanning" ? statementUploadedIcon : statementUploadIcon} alt="" />
+            </span>
           </span>
         </button>
         {hasFile && !locked && (

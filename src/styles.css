@@ -2593,7 +2593,7 @@ select:disabled {
   background: transparent;
   padding: 6px 8px 12px;
   display: grid;
-  min-height: 152px;
+  min-height: 174px;
 }
 
 .bank-tile.active {
@@ -2720,7 +2720,7 @@ select:disabled {
 }
 
 .statement-file-action.empty {
-  min-height: 96px;
+  min-height: 126px;
   justify-content: center;
   padding: 0;
   border: 0;
@@ -2728,7 +2728,7 @@ select:disabled {
 }
 
 .statement-file-action.has-file {
-  min-height: 96px;
+  min-height: 126px;
   justify-content: center;
   padding: 0;
   border: 0;
@@ -2742,8 +2742,8 @@ select:disabled {
 .bank-tile.scanning .statement-file-object::before {
   content: "";
   position: absolute;
-  top: 12px;
-  bottom: 5px;
+  top: 10px;
+  bottom: 14px;
   left: -42%;
   z-index: 2;
   width: 46%;
@@ -2767,18 +2767,18 @@ select:disabled {
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 116px;
-  min-height: 110px;
+  width: 128px;
+  min-height: 136px;
   overflow: visible;
   transform: translateY(0);
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .statement-file-art {
-  width: 98px;
+  width: 92px;
   height: auto;
   display: block;
-  transform: translate(7px, 8px);
+  transform: translate(7px, 3px);
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2796,30 +2796,47 @@ select:disabled {
 }
 
 .statement-file-action.empty:hover .statement-file-art {
-  transform: translate(7px, 4px);
+  transform: translate(7px, 0);
 }
 
 .statement-file-state {
   position: absolute;
-  right: 8px;
-  bottom: 7px;
+  right: 4px;
+  bottom: 3px;
   z-index: 3;
-  width: 22px;
-  height: 22px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
-  color: var(--on-dark);
-  background: var(--canvas-dark);
-  box-shadow: 0 0 0 3px var(--canvas-light), 0 8px 16px rgba(18, 20, 24, 0.18);
   display: grid;
   place-items: center;
+  pointer-events: none;
+}
+
+.statement-file-state img {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .statement-file-state.uploaded {
-  background: var(--success);
+  width: 42px;
+  height: 42px;
+  right: 7px;
+  bottom: 8px;
 }
 
 .statement-file-state.scanning {
-  background: var(--primary);
+  animation: upload-button-pulse 1.15s ease-in-out infinite;
+}
+
+@keyframes upload-button-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
 }
 
 .statement-remove-button {
