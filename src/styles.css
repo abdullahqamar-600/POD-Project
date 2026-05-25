@@ -753,6 +753,7 @@ select:disabled {
   background: var(--surface);
   overflow: hidden;
   display: grid;
+  grid-template-rows: 46px minmax(0, 1fr);
   align-content: start;
 }
 
@@ -774,6 +775,7 @@ select:disabled {
 .agent-pipeline-bar,
 .session-metric-strip {
   min-width: 0;
+  height: 100%;
   display: grid;
 }
 
@@ -847,7 +849,7 @@ select:disabled {
 .dashboard-metric-cell {
   min-width: 0;
   min-height: 76px;
-  padding: 12px 12px;
+  padding: 14px 12px;
   display: grid;
   align-content: center;
   gap: 4px;
@@ -1421,7 +1423,7 @@ select:disabled {
 }
 
 .dashboard-session-list {
-  --dashboard-session-columns: minmax(138px, 0.82fr) minmax(250px, 1.7fr) 86px 112px 104px 88px 26px;
+  --dashboard-session-columns: minmax(124px, 0.82fr) minmax(190px, 1.7fr) 76px 104px 88px 74px 24px;
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -1430,7 +1432,7 @@ select:disabled {
 }
 
 .dashboard-session-columns {
-  min-width: 760px;
+  min-width: 748px;
   min-height: 34px;
   border-bottom: 1px solid var(--hairline);
   padding: 0 14px;
@@ -1444,7 +1446,7 @@ select:disabled {
 }
 
 .dashboard-session-rows {
-  min-width: 760px;
+  min-width: 748px;
   min-height: 0;
   display: grid;
   align-content: start;
@@ -1524,8 +1526,6 @@ select:disabled {
 }
 
 .dashboard-session-number,
-.dashboard-ledger-outcome,
-.dashboard-session-latency,
 .dashboard-session-time {
   min-width: 0;
   display: block;
@@ -1541,8 +1541,6 @@ select:disabled {
   font-weight: 500;
 }
 
-.dashboard-ledger-outcome,
-.dashboard-session-latency,
 .dashboard-session-time {
   color: var(--body);
   font-weight: 500;
