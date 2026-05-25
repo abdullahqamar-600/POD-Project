@@ -2712,13 +2712,11 @@ function BankTile({
 }) {
   const locked = runState !== "draft";
   const hasFile = Boolean(uploaded);
-  const statusStage = hasFile ? stage : locked ? "not-included" : "waiting";
   const uploadActionLabel = hasFile
     ? locked
       ? `${bank.shortName} statement uploaded`
       : `Replace ${bank.shortName} statement`
     : `Upload ${bank.shortName} statement`;
-  const showStage = hasFile && statusStage !== "waiting";
 
   return (
     <motion.article
@@ -2735,7 +2733,6 @@ function BankTile({
           </span>
           <strong>{bank.shortName}</strong>
         </div>
-        {showStage && <StageBadge stage={statusStage} />}
         <button
           className={`statement-file-action ${hasFile ? "has-file" : "empty"}`}
           type="button"
