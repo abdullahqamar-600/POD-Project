@@ -1072,7 +1072,7 @@ function App() {
       <Sidebar
         sessions={sessions}
         selectedSession={selectedSession}
-        setSelectedSession={setSelectedSession}
+        onOpenSession={openDashboardSession}
         onNewSession={openNewSessionPicker}
         activeView={activeView}
         setActiveView={setActiveView}
@@ -1515,7 +1515,7 @@ function getComparisonCopy(bank, runState, progress, records) {
 function Sidebar({
   sessions,
   selectedSession,
-  setSelectedSession,
+  onOpenSession,
   onNewSession,
   activeView,
   setActiveView
@@ -1612,10 +1612,7 @@ function Sidebar({
             <button
               className={`session-item ${session.id === selectedSession ? "selected" : ""}`}
               key={session.id}
-              onClick={() => {
-                setSelectedSession(session.id);
-                setActiveView("dashboard");
-              }}
+              onClick={() => onOpenSession(session)}
             >
               <strong>{session.property}</strong>
               <StatusPill status={session.status} />
