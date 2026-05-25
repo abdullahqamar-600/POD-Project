@@ -1681,14 +1681,20 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
       <div className="breadcrumb">
         <Home size={15} />
         <span>Dashboard</span>
-        <ChevronRight size={14} />
-        <span>{activeLabel}</span>
+        {activeView !== "dashboard" && (
+          <>
+            <ChevronRight size={14} />
+            <span>{activeLabel}</span>
+          </>
+        )}
       </div>
       <div className="topbar-actions">
-        <span className={`run-dot ${statusClass}`}>
-          <Activity size={14} />
-          {statusLabel}
-        </span>
+        {activeView !== "dashboard" && (
+          <span className={`run-dot ${statusClass}`}>
+            <Activity size={14} />
+            {statusLabel}
+          </span>
+        )}
         {activeView === "workspace" && (
           <button className="icon-button rail-toggle" onClick={() => setRailOpen(!railOpen)} aria-label="Toggle observability rail">
             {railOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
@@ -1909,10 +1915,10 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
     dashboardRows.reduce((sum, row) => sum + row.automation, 0) / Math.max(dashboardRows.length, 1)
   );
   const pipelineAgents = [
-    { name: "Parsing", state: "3 complete", latency: "1.9s avg", tokens: "2.3k avg", status: "complete" },
-    { name: "Reconciliation", state: "2 complete", latency: "4.1s avg", tokens: "6.8k avg", status: "running" },
-    { name: "Exception", state: "2 in review", latency: "1.1s avg", tokens: "2.1k avg", status: "running" },
-    { name: "Summary", state: "1 waiting", latency: "0.8s avg", tokens: "0.9k avg", status: "idle" }
+    { name: "Parsing", latency: "1.9s", tokens: "2.3k" },
+    { name: "Reconciliation", latency: "4.1s", tokens: "6.8k" },
+    { name: "Exception", latency: "1.1s", tokens: "2.1k" },
+    { name: "Summary", latency: "0.8s", tokens: "0.9k" }
   ];
   const sessionMetrics = [
     { label: "Banks reconciled", value: `${banksDone}/${banksTotal}`, meta: "Resolved across sessions" },
@@ -1924,33 +1930,23 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
   return (
     <section className="dashboard-canvas" aria-label="Dashboard">
       <section className="dashboard-observability-strip" aria-label="AI observability">
-        <div className="dashboard-observability-main">
-          <div className="dashboard-observability-heading">
-            <div>
-              <p className="eyebrow">AI observability</p>
-              <h1>Portfolio agent dashboard</h1>
-              <p>
-                {sessions.length} sessions tracked across {properties.length} properties. Averages reflect current close-cycle work.
-              </p>
-            </div>
-            <span className="observability-status live">
-              <Activity size={15} />
-              Live portfolio
-            </span>
-          </div>
-
-          <div className="agent-pipeline-bar" aria-label="Average agent pipeline">
-            {pipelineAgents.map((agent) => (
-              <DashboardAgentChip key={agent.name} agent={agent} />
-            ))}
-          </div>
-
+        <section className="dashboard-metric-panel" aria-label="Portfolio metrics">
+          <h2>Portfolio metrics</h2>
           <div className="session-metric-strip" aria-label="Portfolio session metrics">
             {sessionMetrics.map((metric) => (
               <DashboardMetricCell key={metric.label} metric={metric} />
             ))}
           </div>
-        </div>
+        </section>
+
+        <section className="dashboard-agent-panel" aria-label="Agent overview">
+          <h2>Agent overview</h2>
+          <div className="agent-pipeline-bar" aria-label="Average agent pipeline">
+            {pipelineAgents.map((agent) => (
+              <DashboardAgentChip key={agent.name} agent={agent} />
+            ))}
+          </div>
+        </section>
       </section>
 
       <section className="dashboard-session-workspace" aria-label="Session overview">
@@ -1969,13 +1965,11 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
           <div className="dashboard-session-list" aria-label="Reconciliation sessions">
             <div className="dashboard-session-columns" aria-hidden="true">
               <span>Session</span>
-              <span>Stage</span>
               <span>Summary</span>
               <span>Confidence</span>
-              <span>Exceptions</span>
-              <span>Ledger</span>
-              <span>Posted</span>
-              <span>Latency</span>
+              <span>Record exceptions</span>
+              <span>Records posted</span>
+              <span>Total time</span>
               <span />
             </div>
             <div className="dashboard-session-rows">
@@ -1991,16 +1985,18 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
                     <strong>{row.property}</strong>
                     <small>{row.cycle} · {row.accountant}</small>
                   </span>
-                  <DashboardStageBadge stage={row.stage} />
                   <span className="dashboard-session-summary">
                     <strong>{row.summary}</strong>
-                    <small>{row.banksDone}/{row.bankCount} banks · {row.duration}</small>
+                    <small>{row.banksDone}/{row.bankCount} banks</small>
                   </span>
-                  <DashboardConfidenceBadge value={row.confidence} tone={row.confidenceTone} />
+                  {row.stage === "Needs input" ? (
+                    <span className="dashboard-confidence empty" aria-label="No confidence yet">-</span>
+                  ) : (
+                    <DashboardConfidenceBadge value={row.confidence} tone={row.confidenceTone} />
+                  )}
                   <strong className="dashboard-session-number attention-text">{row.exceptions}</strong>
-                  <span className="dashboard-ledger-outcome">{row.ledger}</span>
                   <strong className="dashboard-session-number">{row.approved}</strong>
-                  <span className="dashboard-session-latency">{row.latency}</span>
+                  <span className="dashboard-session-time">{row.duration}</span>
                   <span className="dashboard-session-action" aria-hidden="true">
                     <ChevronRight size={16} />
                   </span>
@@ -2025,18 +2021,9 @@ function DashboardScreen({ sessions, properties, onNewSession }) {
 }
 
 function DashboardAgentChip({ agent }) {
-  const StatusIcon =
-    agent.status === "complete" ? CheckCircle2 : agent.status === "running" ? Loader2 : CircleDot;
-
   return (
-    <div className={`dashboard-agent-chip ${agent.status}`}>
-      <span className="dashboard-agent-state">
-        <StatusIcon size={15} className={agent.status === "running" ? "spin" : ""} />
-      </span>
-      <div>
-        <strong>{agent.name}</strong>
-        <span>{agent.state}</span>
-      </div>
+    <div className="dashboard-agent-chip">
+      <strong>{agent.name}</strong>
       <dl>
         <div>
           <dt>Avg time</dt>
@@ -2059,10 +2046,6 @@ function DashboardMetricCell({ metric }) {
       <small>{metric.meta}</small>
     </div>
   );
-}
-
-function DashboardStageBadge({ stage }) {
-  return <span className={`stage-badge ${stage.toLowerCase().replaceAll(" ", "-")}`}>{stage}</span>;
 }
 
 function DashboardConfidenceBadge({ value, tone }) {
