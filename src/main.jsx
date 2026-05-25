@@ -1610,7 +1610,7 @@ function Sidebar({
         <div className="session-list">
           {visibleSessions.map((session) => (
             <button
-              className={`session-item ${session.id === selectedSession ? "selected" : ""}`}
+              className={`session-item ${activeView === "workspace" && session.id === selectedSession ? "selected" : ""}`}
               key={session.id}
               onClick={() => onOpenSession(session)}
             >
@@ -1699,112 +1699,226 @@ function TopBar({ selectedProperty, runState, railOpen, setRailOpen, activeView 
   );
 }
 
-function DashboardScreen({ sessions, properties, onOpenSession, onNewSession }) {
-  const observedProperty = properties[0];
+function DashboardScreen({ sessions, properties, onNewSession }) {
+  const [selectedInsightId, setSelectedInsightId] = useState(null);
+  const sessionSignals = {
+    "ses-1": {
+      stage: "Review",
+      summary: "Review package ready; exceptions grouped by bank.",
+      confidence: "97%",
+      confidenceTone: "high",
+      ledger: "Yardi matched",
+      approved: 8,
+      exceptions: 5,
+      banksDone: 3,
+      latency: "9.4s",
+      duration: "14m",
+      automation: 94.8,
+      totalTokens: "14.9k",
+      totalLatency: "9.4s",
+      readout: ["Chase and Wells Fargo matched cleanly.", "BofA variance is driving review risk."],
+      tokenBars: [
+        { label: "Parsing", value: "2.8k", percent: 32 },
+        { label: "Reconciliation", value: "8.7k", percent: 100 },
+        { label: "Exception", value: "3.4k", percent: 39 },
+        { label: "Summary", value: "0", percent: 0 }
+      ],
+      latencyBars: [
+        { label: "Parsing", value: "1.6s", percent: 38 },
+        { label: "Reconciliation", value: "4.2s", percent: 100 },
+        { label: "Exception", value: "1.1s", percent: 26 },
+        { label: "Summary", value: "0.0s", percent: 0 }
+      ],
+      anomalySignals: ["BofA match rate 82% vs 94% avg last 3 cycles", "5 exceptions vs avg 2.1", "Reconciliation latency up 18% from April"],
+      riskRows: [
+        { agent: "Parsing", risk: "Low" },
+        { agent: "Reconciliation", risk: "Medium" },
+        { agent: "Exception", risk: "Medium" },
+        { agent: "Summary", risk: "Idle" }
+      ],
+      feedbackSignals: [
+        { label: "Approved as-is", value: "8" },
+        { label: "Moved to exceptions", value: "1" },
+        { label: "Moved to approved", value: "0" },
+        { label: "Rules captured", value: "3" }
+      ],
+      eventTimeline: [
+        { time: "09:02", type: "user", title: "Statements uploaded" },
+        { time: "09:08", type: "agent", title: "Reconciliation completed" },
+        { time: "09:10", type: "reviewer", title: "Exception feedback saved" },
+        { time: "09:12", type: "system", title: "Summary waiting on Yardi" }
+      ]
+    },
+    "ses-2": {
+      stage: "Parsing",
+      summary: "Statements are normalizing; ledger import is still running.",
+      confidence: "91%",
+      confidenceTone: "medium",
+      ledger: "Import running",
+      approved: 0,
+      exceptions: 1,
+      banksDone: 1,
+      latency: "3.2s",
+      duration: "5m",
+      automation: 76,
+      totalTokens: "6.2k",
+      totalLatency: "3.2s",
+      readout: ["Statement parser is stable.", "Yardi ledger import is the current wait point."],
+      tokenBars: [
+        { label: "Parsing", value: "3.1k", percent: 100 },
+        { label: "Reconciliation", value: "2.2k", percent: 71 },
+        { label: "Exception", value: "0.9k", percent: 29 },
+        { label: "Summary", value: "0", percent: 0 }
+      ],
+      latencyBars: [
+        { label: "Parsing", value: "1.9s", percent: 100 },
+        { label: "Reconciliation", value: "1.0s", percent: 53 },
+        { label: "Exception", value: "0.3s", percent: 16 },
+        { label: "Summary", value: "0.0s", percent: 0 }
+      ],
+      anomalySignals: ["Parsing tokens 12% above rolling average", "One reserve statement produced low OCR confidence"],
+      riskRows: [
+        { agent: "Parsing", risk: "Medium" },
+        { agent: "Reconciliation", risk: "Idle" },
+        { agent: "Exception", risk: "Idle" },
+        { agent: "Summary", risk: "Idle" }
+      ],
+      feedbackSignals: [
+        { label: "Approved as-is", value: "0" },
+        { label: "Moved to exceptions", value: "0" },
+        { label: "Moved to approved", value: "0" },
+        { label: "Rules captured", value: "0" }
+      ],
+      eventTimeline: [
+        { time: "10:18", type: "user", title: "Two statements uploaded" },
+        { time: "10:19", type: "agent", title: "Parsing started" },
+        { time: "10:20", type: "system", title: "Yardi import running" }
+      ]
+    },
+    "ses-3": {
+      stage: "Needs input",
+      summary: "Manual ledger is missing before matching can start.",
+      confidence: "68%",
+      confidenceTone: "low",
+      ledger: "Ledger missing",
+      approved: 0,
+      exceptions: 4,
+      banksDone: 0,
+      latency: "0.9s",
+      duration: "Paused",
+      automation: 0,
+      totalTokens: "1.1k",
+      totalLatency: "0.9s",
+      readout: ["The run stopped before reconciliation.", "Manual ledger upload is required."],
+      tokenBars: [
+        { label: "Parsing", value: "1.1k", percent: 100 },
+        { label: "Reconciliation", value: "0", percent: 0 },
+        { label: "Exception", value: "0", percent: 0 },
+        { label: "Summary", value: "0", percent: 0 }
+      ],
+      latencyBars: [
+        { label: "Parsing", value: "0.9s", percent: 100 },
+        { label: "Reconciliation", value: "0.0s", percent: 0 },
+        { label: "Exception", value: "0.0s", percent: 0 },
+        { label: "Summary", value: "0.0s", percent: 0 }
+      ],
+      anomalySignals: ["Ledger missing for 4 banks", "Automation rate is 0% for this run"],
+      riskRows: [
+        { agent: "Parsing", risk: "Medium" },
+        { agent: "Reconciliation", risk: "Idle" },
+        { agent: "Exception", risk: "Idle" },
+        { agent: "Summary", risk: "Idle" }
+      ],
+      feedbackSignals: [
+        { label: "Approved as-is", value: "0" },
+        { label: "Moved to exceptions", value: "0" },
+        { label: "Moved to approved", value: "0" },
+        { label: "Rules captured", value: "0" }
+      ],
+      eventTimeline: [
+        { time: "15:04", type: "user", title: "Statement uploaded" },
+        { time: "15:05", type: "system", title: "Manual ledger requested" }
+      ]
+    },
+    "ses-4": {
+      stage: "Complete",
+      summary: "All records posted to Yardi; no open exceptions.",
+      confidence: "98%",
+      confidenceTone: "high",
+      ledger: "Posted to Yardi",
+      approved: 12,
+      exceptions: 0,
+      banksDone: 2,
+      latency: "7.8s",
+      duration: "11m",
+      automation: 100,
+      totalTokens: "12.2k",
+      totalLatency: "7.8s",
+      readout: ["Exact match rate stayed above baseline.", "Summary output was posted without reviewer override."],
+      tokenBars: [
+        { label: "Parsing", value: "2.1k", percent: 33 },
+        { label: "Reconciliation", value: "6.4k", percent: 100 },
+        { label: "Exception", value: "2.0k", percent: 31 },
+        { label: "Summary", value: "1.7k", percent: 27 }
+      ],
+      latencyBars: [
+        { label: "Parsing", value: "1.3s", percent: 31 },
+        { label: "Reconciliation", value: "4.2s", percent: 100 },
+        { label: "Exception", value: "0.9s", percent: 21 },
+        { label: "Summary", value: "1.4s", percent: 33 }
+      ],
+      anomalySignals: ["No material anomaly detected", "Token use 8% below prior cycle"],
+      riskRows: [
+        { agent: "Parsing", risk: "Low" },
+        { agent: "Reconciliation", risk: "Low" },
+        { agent: "Exception", risk: "Low" },
+        { agent: "Summary", risk: "Low" }
+      ],
+      feedbackSignals: [
+        { label: "Approved as-is", value: "12" },
+        { label: "Moved to exceptions", value: "0" },
+        { label: "Moved to approved", value: "0" },
+        { label: "Rules captured", value: "1" }
+      ],
+      eventTimeline: [
+        { time: "08:41", type: "agent", title: "Reconciliation completed" },
+        { time: "08:43", type: "system", title: "Yardi update completed" },
+        { time: "08:44", type: "system", title: "Report package generated" }
+      ]
+    }
+  };
+  const dashboardRows = sessions.map((session) => {
+    const property = properties.find((item) => item.name === session.property);
+    const signal = sessionSignals[session.id] || sessionSignals["ses-1"];
+    return {
+      ...signal,
+      id: session.id,
+      property: session.property,
+      cycle: session.cycle,
+      status: session.status,
+      accountant: property?.accountant || "Unassigned",
+      bankCount: getPropertyBankCount(property)
+    };
+  });
+  const selectedInsight = dashboardRows.find((row) => row.id === selectedInsightId);
+  const banksDone = dashboardRows.reduce((sum, row) => sum + row.banksDone, 0);
+  const banksTotal = dashboardRows.reduce((sum, row) => sum + row.bankCount, 0);
+  const approvedTotal = dashboardRows.reduce((sum, row) => sum + row.approved, 0);
+  const exceptionTotal = dashboardRows.reduce((sum, row) => sum + row.exceptions, 0);
+  const automationRate = Math.round(
+    dashboardRows.reduce((sum, row) => sum + row.automation, 0) / Math.max(dashboardRows.length, 1)
+  );
   const pipelineAgents = [
-    { name: "Parsing", state: "Complete", latency: "1.6s", tokens: "2.8k", status: "complete" },
-    { name: "Reconciliation", state: "Complete", latency: "4.2s", tokens: "8.7k", status: "complete" },
-    { name: "Exception", state: "Complete", latency: "1.1s", tokens: "3.4k", status: "complete" },
-    { name: "Summary", state: "Idle", latency: "0.0s", tokens: "0", status: "idle" }
+    { name: "Parsing", state: "3 complete", latency: "1.9s avg", tokens: "2.3k avg", status: "complete" },
+    { name: "Reconciliation", state: "2 complete", latency: "4.1s avg", tokens: "6.8k avg", status: "running" },
+    { name: "Exception", state: "2 in review", latency: "1.1s avg", tokens: "2.1k avg", status: "running" },
+    { name: "Summary", state: "1 waiting", latency: "0.8s avg", tokens: "0.9k avg", status: "idle" }
   ];
   const sessionMetrics = [
-    { label: "Banks reconciled", value: "3/3", meta: "All scoped banks" },
-    { label: "Approved records", value: "8", meta: "Sent to Yardi", tone: "good" },
-    { label: "Exceptions", value: "5", meta: "Needs review", tone: "attention" },
-    { label: "Automation rate", value: "94.8%", meta: "Resolved by agent" }
-  ];
-  const bankResults = [
-    {
-      bank: banks[0],
-      account: "ending 4419",
-      confidence: "97%",
-      tone: "high",
-      summary: "Reconciliation matched 139 of 142 lines; 3 items need exception review.",
-      approved: 3,
-      exceptions: 2,
-      difference: "$42.50",
-      latency: "4.2s"
-    },
-    {
-      bank: banks[1],
-      account: "ending 8821",
-      confidence: "94%",
-      tone: "high",
-      summary: "Reserve transfer and vendor EFT matched cleanly; one cutoff item remains.",
-      approved: 2,
-      exceptions: 1,
-      difference: "$0.00",
-      latency: "2.1s"
-    },
-    {
-      bank: banks[2],
-      account: "ending 1187",
-      confidence: "82%",
-      tone: "medium",
-      summary: "Security deposits mostly matched; one NSF reversal explains the variance.",
-      approved: 3,
-      exceptions: 2,
-      difference: "$1,250.00",
-      latency: "5.8s"
-    }
-  ];
-  const reasoningTrace = [
-    {
-      actor: "Agent",
-      title: "Matched exact records",
-      copy: "Amount, date, and reference matches cleared Chase and Wells Fargo lines."
-    },
-    {
-      actor: "Agent",
-      title: "Hypothesized split timing",
-      copy: "BofA NSF reversal looked like a ledger correction, not missing cash."
-    },
-    {
-      actor: "Reviewer",
-      title: "Confirmed treatment",
-      copy: "Timing records stayed approved. NSF remains flagged for controller review."
-    },
-    {
-      actor: "System",
-      title: "Guidance captured",
-      copy: "Rule saved for future NSF reversals and passed to the Summary stage."
-    }
-  ];
-  const tokenBars = [
-    { label: "Parsing", value: "2.8k", percent: 32 },
-    { label: "Reconciliation", value: "8.7k", percent: 100 },
-    { label: "Exception", value: "3.4k", percent: 39 },
-    { label: "Summary", value: "0", percent: 0 }
-  ];
-  const latencyBars = [
-    { label: "Parsing", value: "1.6s", percent: 38 },
-    { label: "Reconciliation", value: "4.2s", percent: 100 },
-    { label: "Exception", value: "1.1s", percent: 26 },
-    { label: "Summary", value: "0.0s", percent: 0 }
-  ];
-  const anomalySignals = [
-    "BofA match rate 82% vs 94% avg last 3 cycles",
-    "5 exceptions vs avg 2.1",
-    "Reconciliation latency up 18% from April"
-  ];
-  const riskRows = [
-    { agent: "Parsing", risk: "Low" },
-    { agent: "Reconciliation", risk: "Medium" },
-    { agent: "Exception", risk: "Medium" },
-    { agent: "Summary", risk: "Idle" }
-  ];
-  const feedbackSignals = [
-    { label: "Approved as-is", value: "8" },
-    { label: "Moved to exceptions", value: "1" },
-    { label: "Moved to approved", value: "0" },
-    { label: "Rules captured", value: "3" }
-  ];
-  const eventTimeline = [
-    { time: "09:02", type: "user", title: "Statements uploaded" },
-    { time: "09:03", type: "agent", title: "Parsing completed" },
-    { time: "09:08", type: "agent", title: "Reconciliation completed" },
-    { time: "09:10", type: "reviewer", title: "Exception feedback saved" },
-    { time: "09:12", type: "system", title: "Summary waiting on Yardi handoff" }
+    { label: "Banks reconciled", value: `${banksDone}/${banksTotal}`, meta: "Resolved across sessions" },
+    { label: "Approved posted", value: String(approvedTotal), meta: "Sent to Yardi", tone: "good" },
+    { label: "Exceptions", value: String(exceptionTotal), meta: "Need controller attention", tone: "attention" },
+    { label: "Automation rate", value: `${automationRate}%`, meta: "Portfolio average" }
   ];
 
   return (
@@ -1814,172 +1928,96 @@ function DashboardScreen({ sessions, properties, onOpenSession, onNewSession }) 
           <div className="dashboard-observability-heading">
             <div>
               <p className="eyebrow">AI observability</p>
-              <h1>{observedProperty.name} review run</h1>
+              <h1>Portfolio agent dashboard</h1>
               <p>
-                May 2026 · {getPropertyBankCount(observedProperty)} banks · Controller review ready
+                {sessions.length} sessions tracked across {properties.length} properties. Averages reflect current close-cycle work.
               </p>
             </div>
-            <span className="observability-status">
-              <CheckCircle2 size={15} />
-              Ready
+            <span className="observability-status live">
+              <Activity size={15} />
+              Live portfolio
             </span>
           </div>
 
-          <div className="agent-pipeline-bar" aria-label="Agent pipeline">
+          <div className="agent-pipeline-bar" aria-label="Average agent pipeline">
             {pipelineAgents.map((agent) => (
               <DashboardAgentChip key={agent.name} agent={agent} />
             ))}
           </div>
 
-          <div className="session-metric-strip" aria-label="Session metrics">
+          <div className="session-metric-strip" aria-label="Portfolio session metrics">
             {sessionMetrics.map((metric) => (
               <DashboardMetricCell key={metric.label} metric={metric} />
             ))}
           </div>
-
-          <section className="dashboard-subsection bank-results-section" aria-label="Per-bank results">
-            <div className="dashboard-subsection-head">
-              <div>
-                <p className="eyebrow">Per-bank results</p>
-                <h2>Statement and Yardi outcomes</h2>
-              </div>
-              <span>Lowest confidence surfaces first in review</span>
-            </div>
-            <div className="bank-results-table">
-              <div className="bank-results-columns" aria-hidden="true">
-                <span>Bank</span>
-                <span>Confidence</span>
-                <span>Agent summary</span>
-                <span>Approved</span>
-                <span>Exceptions</span>
-                <span>Net diff</span>
-                <span>Latency</span>
-              </div>
-              {bankResults.map((result) => (
-                <DashboardBankResult key={result.bank.id} result={result} />
-              ))}
-            </div>
-          </section>
-
-          <section className="dashboard-subsection reasoning-trace-section" aria-label="Agent reasoning trace">
-            <div className="dashboard-subsection-head">
-              <div>
-                <p className="eyebrow">Reasoning trace</p>
-                <h2>Why the package needs review</h2>
-              </div>
-            </div>
-            <ol className="reasoning-trace-list">
-              {reasoningTrace.map((step, index) => (
-                <DashboardTraceStep key={`${step.actor}-${step.title}`} step={step} index={index} />
-              ))}
-            </ol>
-          </section>
         </div>
-
-        <aside className="dashboard-observability-rail" aria-label="Operational signals">
-          <DashboardRailBlock title="Token usage" meta="14.9k total">
-            <div className="mini-bar-list">
-              {tokenBars.map((bar) => (
-                <MiniDashboardBar key={bar.label} bar={bar} tone="token" />
-              ))}
-            </div>
-          </DashboardRailBlock>
-
-          <DashboardRailBlock title="Agent latency" meta="6.9s total">
-            <div className="mini-bar-list">
-              {latencyBars.map((bar) => (
-                <MiniDashboardBar key={bar.label} bar={bar} tone="latency" />
-              ))}
-            </div>
-          </DashboardRailBlock>
-
-          <DashboardRailBlock title="Anomaly signals" meta="3 flags">
-            <div className="dashboard-anomaly-list">
-              {anomalySignals.map((signal) => (
-                <span key={signal}>
-                  <AlertTriangle size={13} />
-                  {signal}
-                </span>
-              ))}
-            </div>
-          </DashboardRailBlock>
-
-          <DashboardRailBlock title="Confidence risk" meta="Agent certainty">
-            <div className="dashboard-risk-list">
-              {riskRows.map((row) => (
-                <div key={row.agent}>
-                  <span>{row.agent}</span>
-                  <strong className={row.risk.toLowerCase()}>{row.risk}</strong>
-                </div>
-              ))}
-            </div>
-          </DashboardRailBlock>
-
-          <DashboardRailBlock title="Reviewer feedback" meta="This cycle">
-            <div className="dashboard-feedback-grid">
-              {feedbackSignals.map((signal) => (
-                <div key={signal.label}>
-                  <strong>{signal.value}</strong>
-                  <span>{signal.label}</span>
-                </div>
-              ))}
-            </div>
-          </DashboardRailBlock>
-
-          <DashboardRailBlock title="Event timeline" meta="Audit stream">
-            <ol className="dashboard-event-list">
-              {eventTimeline.map((event) => (
-                <DashboardEventItem key={`${event.time}-${event.title}`} event={event} />
-              ))}
-            </ol>
-          </DashboardRailBlock>
-        </aside>
       </section>
 
-      <section className="dashboard-session-workspace" aria-label="Session workspace">
+      <section className="dashboard-session-workspace" aria-label="Session overview">
         <div className="dashboard-workspace-head">
-          <h2>Past sessions</h2>
+          <div>
+            <h2>Session overview</h2>
+            <p>Select a row to inspect token usage, latency, and anomalies.</p>
+          </div>
           <button className="primary-button dashboard-new-session" type="button" onClick={onNewSession}>
             <Plus size={14} />
             New session
           </button>
         </div>
 
-        <div className="dashboard-workspace-grid">
-          <div className="dashboard-session-list" aria-label="Past reconciliation sessions">
+        <div className={`dashboard-workspace-grid ${selectedInsight ? "has-insight" : ""}`}>
+          <div className="dashboard-session-list" aria-label="Reconciliation sessions">
             <div className="dashboard-session-columns" aria-hidden="true">
               <span>Session</span>
               <span>Stage</span>
               <span>Summary</span>
+              <span>Confidence</span>
+              <span>Exceptions</span>
+              <span>Ledger</span>
+              <span>Posted</span>
+              <span>Latency</span>
               <span />
             </div>
             <div className="dashboard-session-rows">
-              {sessions.map((session) => {
-                const property = properties.find((item) => item.name === session.property);
-                return (
-                  <button
-                    className="dashboard-session-row"
-                    key={session.id}
-                    type="button"
-                    onClick={() => onOpenSession(session)}
-                  >
-                    <span className="dashboard-session-name">
-                      <strong>{session.property}</strong>
-                      <small>{session.cycle} · {property?.accountant || "Unassigned"}</small>
-                    </span>
-                    <DashboardStatusPill status={session.status} />
-                    <span className="dashboard-session-summary">
-                      <strong>{session.detail}</strong>
-                      <small>{dashboardSessionSummaryMeta(property)}</small>
-                    </span>
-                    <span className="dashboard-session-action" aria-hidden="true">
-                      <ChevronRight size={16} />
-                    </span>
-                  </button>
-                );
-              })}
+              {dashboardRows.map((row) => (
+                <button
+                  className={`dashboard-session-row ${selectedInsight?.id === row.id ? "selected" : ""}`}
+                  key={row.id}
+                  type="button"
+                  aria-pressed={selectedInsight?.id === row.id}
+                  onClick={() => setSelectedInsightId(row.id)}
+                >
+                  <span className="dashboard-session-name">
+                    <strong>{row.property}</strong>
+                    <small>{row.cycle} · {row.accountant}</small>
+                  </span>
+                  <DashboardStageBadge stage={row.stage} />
+                  <span className="dashboard-session-summary">
+                    <strong>{row.summary}</strong>
+                    <small>{row.banksDone}/{row.bankCount} banks · {row.duration}</small>
+                  </span>
+                  <DashboardConfidenceBadge value={row.confidence} tone={row.confidenceTone} />
+                  <strong className="dashboard-session-number attention-text">{row.exceptions}</strong>
+                  <span className="dashboard-ledger-outcome">{row.ledger}</span>
+                  <strong className="dashboard-session-number">{row.approved}</strong>
+                  <span className="dashboard-session-latency">{row.latency}</span>
+                  <span className="dashboard-session-action" aria-hidden="true">
+                    <ChevronRight size={16} />
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
+
+          <AnimatePresence initial={false}>
+            {selectedInsight && (
+              <DashboardInsightRail
+                key={selectedInsight.id}
+                insight={selectedInsight}
+                onClose={() => setSelectedInsightId(null)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </section>
     </section>
@@ -2001,7 +2039,7 @@ function DashboardAgentChip({ agent }) {
       </div>
       <dl>
         <div>
-          <dt>Time</dt>
+          <dt>Avg time</dt>
           <dd>{agent.latency}</dd>
         </div>
         <div>
@@ -2023,43 +2061,103 @@ function DashboardMetricCell({ metric }) {
   );
 }
 
-function DashboardBankResult({ result }) {
-  return (
-    <div className="dashboard-bank-result">
-      <div className="dashboard-bank-identity">
-        <span className={`mini-bank-logo ${result.bank.brandClass}`}>
-          <img src={result.bank.logo} alt="" />
-        </span>
-        <div>
-          <strong>{result.bank.shortName}</strong>
-          <span>{result.account}</span>
-        </div>
-      </div>
-      <span className={`dashboard-confidence ${result.tone}`}>{result.confidence}</span>
-      <p>{result.summary}</p>
-      <strong>{result.approved}</strong>
-      <strong className="attention-text">{result.exceptions}</strong>
-      <strong>{result.difference}</strong>
-      <span>{result.latency}</span>
-    </div>
-  );
+function DashboardStageBadge({ stage }) {
+  return <span className={`stage-badge ${stage.toLowerCase().replaceAll(" ", "-")}`}>{stage}</span>;
 }
 
-function DashboardTraceStep({ step, index }) {
-  const Icon = step.actor === "Reviewer" ? MessageCircle : step.actor === "System" ? Workflow : Sparkles;
+function DashboardConfidenceBadge({ value, tone }) {
+  return <span className={`dashboard-confidence ${tone}`}>{value}</span>;
+}
 
+function DashboardInsightRail({ insight, onClose }) {
   return (
-    <li className={`dashboard-trace-step ${step.actor.toLowerCase()}`}>
-      <span className="dashboard-trace-index">{String(index + 1).padStart(2, "0")}</span>
-      <span className="dashboard-trace-icon">
-        <Icon size={15} />
-      </span>
-      <div>
-        <span>{step.actor}</span>
-        <strong>{step.title}</strong>
-        <p>{step.copy}</p>
+    <motion.aside
+      className="dashboard-insight-rail"
+      aria-label={`${insight.property} observability`}
+      initial={{ opacity: 0, x: 18 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 18 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className="dashboard-insight-head">
+        <div>
+          <span>Session insight</span>
+          <strong>{insight.property}</strong>
+          <p>{insight.summary}</p>
+        </div>
+        <button className="icon-button ghost" type="button" aria-label="Close session insight" onClick={onClose}>
+          <X size={16} />
+        </button>
       </div>
-    </li>
+
+      <DashboardRailBlock title="Session readout" meta={insight.stage}>
+        <div className="dashboard-readout-list">
+          {insight.readout.map((item) => (
+            <span key={item}>
+              <CheckCircle2 size={13} />
+              {item}
+            </span>
+          ))}
+        </div>
+      </DashboardRailBlock>
+
+      <DashboardRailBlock title="Token usage" meta={`${insight.totalTokens} total`}>
+        <div className="mini-bar-list">
+          {insight.tokenBars.map((bar) => (
+            <MiniDashboardBar key={bar.label} bar={bar} tone="token" />
+          ))}
+        </div>
+      </DashboardRailBlock>
+
+      <DashboardRailBlock title="Agent latency" meta={`${insight.totalLatency} total`}>
+        <div className="mini-bar-list">
+          {insight.latencyBars.map((bar) => (
+            <MiniDashboardBar key={bar.label} bar={bar} tone="latency" />
+          ))}
+        </div>
+      </DashboardRailBlock>
+
+      <DashboardRailBlock title="Anomaly signals" meta={`${insight.anomalySignals.length} flags`}>
+        <div className="dashboard-anomaly-list">
+          {insight.anomalySignals.map((signal) => (
+            <span key={signal}>
+              <AlertTriangle size={13} />
+              {signal}
+            </span>
+          ))}
+        </div>
+      </DashboardRailBlock>
+
+      <DashboardRailBlock title="Confidence risk" meta="Agent certainty">
+        <div className="dashboard-risk-list">
+          {insight.riskRows.map((row) => (
+            <div key={row.agent}>
+              <span>{row.agent}</span>
+              <strong className={row.risk.toLowerCase()}>{row.risk}</strong>
+            </div>
+          ))}
+        </div>
+      </DashboardRailBlock>
+
+      <DashboardRailBlock title="Reviewer feedback" meta="This cycle">
+        <div className="dashboard-feedback-grid">
+          {insight.feedbackSignals.map((signal) => (
+            <div key={signal.label}>
+              <strong>{signal.value}</strong>
+              <span>{signal.label}</span>
+            </div>
+          ))}
+        </div>
+      </DashboardRailBlock>
+
+      <DashboardRailBlock title="Event timeline" meta="Audit stream">
+        <ol className="dashboard-event-list">
+          {insight.eventTimeline.map((event) => (
+            <DashboardEventItem key={`${event.time}-${event.title}`} event={event} />
+          ))}
+        </ol>
+      </DashboardRailBlock>
+    </motion.aside>
   );
 }
 
