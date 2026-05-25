@@ -835,6 +835,7 @@ function App() {
 
   function uploadStatement(bankId) {
     if (runState !== "draft") return;
+    if (bankStage[bankId] === "scanning") return;
     const alreadyUploaded = Boolean(uploaded[bankId]);
     setUploaded((current) => ({ ...current, [bankId]: true }));
     setBankStage((current) => ({ ...current, [bankId]: "scanning" }));
@@ -2746,11 +2747,14 @@ function BankTile({
 }) {
   const locked = runState !== "draft";
   const hasFile = Boolean(uploaded);
-  const uploadActionLabel = hasFile
-    ? locked
-      ? `${bank.shortName} statement uploaded`
-      : `Replace ${bank.shortName} statement`
-    : `Upload ${bank.shortName} statement`;
+  const isScanning = stage === "scanning";
+  const uploadActionLabel = isScanning
+    ? `Scanning ${bank.shortName} statement`
+    : hasFile
+      ? locked
+        ? `${bank.shortName} statement uploaded`
+        : `Replace ${bank.shortName} statement`
+      : `Upload ${bank.shortName} statement`;
 
   return (
     <motion.article
@@ -2767,17 +2771,19 @@ function BankTile({
           <strong>{bank.shortName}</strong>
         </div>
         <button
-          className={`statement-file-action ${hasFile ? "has-file" : "empty"} ${stage === "scanning" ? "is-scanning" : ""}`}
+          className={`statement-file-action ${hasFile ? "has-file" : "empty"} ${isScanning ? "is-scanning" : ""}`}
           type="button"
           disabled={locked}
           onClick={onUpload}
           aria-label={uploadActionLabel}
-          title={hasFile ? bank.statement : uploadActionLabel}
+          aria-disabled={isScanning ? "true" : undefined}
+          aria-busy={isScanning ? "true" : undefined}
+          title={isScanning ? uploadActionLabel : hasFile ? bank.statement : uploadActionLabel}
         >
           <span className="statement-file-object">
             <img className="statement-file-art" src={statementFileIcon} alt="" />
-            <span className={`statement-file-state ${stage === "scanning" ? "scanning" : hasFile ? "uploaded" : "empty"}`} aria-hidden="true">
-              <img src={hasFile && stage !== "scanning" ? statementUploadedIcon : statementUploadIcon} alt="" />
+            <span className={`statement-file-state ${isScanning ? "scanning" : hasFile ? "uploaded" : "empty"}`} aria-hidden="true">
+              <img src={hasFile && !isScanning ? statementUploadedIcon : statementUploadIcon} alt="" />
             </span>
           </span>
         </button>
