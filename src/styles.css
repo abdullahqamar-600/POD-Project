@@ -339,8 +339,9 @@ select:disabled {
 }
 
 .session-item.selected {
-  border-color: rgba(73, 79, 223, 0.22);
-  background: rgba(73, 79, 223, 0.06);
+  border-color: transparent;
+  color: var(--ink);
+  background: var(--surface-soft);
 }
 
 .session-item strong {
@@ -1494,8 +1495,8 @@ select:disabled {
 }
 
 .dashboard-session-row.selected {
-  background: rgba(73, 79, 223, 0.065);
-  box-shadow: inset 0 0 0 1px rgba(73, 79, 223, 0.22);
+  background: var(--surface-soft);
+  box-shadow: none;
 }
 
 .dashboard-session-name {
